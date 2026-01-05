@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Viewer</title>
+
+  <!-- Cesium (CDN) -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <!-- Fullscreen map behind everything -->
+  <div id="mapWrap">
+    <div id="cesiumContainer"></div>
+    <div id="invisibleCredits" style="display:none;"></div>
+  </div>
+
+  <!-- Drawer backdrop (click closes drawer) -->
+  <div id="drawerBackdrop" class="hidden" aria-hidden="true"></div>
+
+  <!-- Right drawer (legend) -->
+  <aside id="drawer" class="hidden" aria-label="Legende">
+    <div class="drawerHeader">
+      <div class="drawerTitle">
+        <div class="drawerTitleMain">Legende</div>
+        <div class="drawerTitleSub">Layer & Transparenz</div>
+      </div>
+      <button id="drawerClose" class="iconBtn" type="button" aria-label="Close">✖</button>
+    </div>
+
+    <div class="drawerBody">
+      <ul id="legend"></ul>
+    </div>
+  </aside>
+
+  <!-- Burger button (top-right overlay) -->
+  <button id="drawerToggle" class="fab" type="button" aria-label="Menu">☰</button>
+
+  <script type="module" src="./main.js"></script>
+
+  <script>
+    // Drawer state (overlay)
+    const toggleBtn = document.getElementById('drawerToggle');
+    const closeBtn = document.getElementById('drawerClose');
+    const drawer = document.getElementById('drawer');
+    const backdrop = document.getElementById('drawerBackdrop');
+
+    function openDrawer() {
+      drawer.classList.remove('hidden');
+      backdrop.classList.remove('hidden');
+    }
+
+    function closeDrawer() {
+      drawer.classList.add('hidden');
+      backdrop.classList.add('hidden');
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = drawer.classList.contains('hidden');
+      if (isHidden) openDrawer();
+      else closeDrawer();
+    });
+
+    closeBtn.addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+
+    // Optional: close with Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeDrawer();
+    });
+  </script>
+</body>
+</html>

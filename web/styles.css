@@ -1,0 +1,204 @@
+/* ---------- Base reset ---------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* Modern neutral font stack */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  background: #0b0f14; /* prevents white flashes */
+  overflow: hidden;
+}
+
+/* ---------- Fullscreen Cesium ---------- */
+#mapWrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+#cesiumContainer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Backdrop ---------- */
+#drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Drawer (right overlay) ---------- */
+#drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 380px;
+  max-width: 92vw;
+  z-index: 1000;
+
+  background: rgba(245, 247, 250, 0.96);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.28);
+
+  display: flex;
+  flex-direction: column;
+
+  /* Slide-in animation */
+  transform: translateX(0);
+  animation: drawerIn 180ms ease-out;
+}
+
+@keyframes drawerIn {
+  from { transform: translateX(12px); opacity: 0.9; }
+  to   { transform: translateX(0);    opacity: 1;   }
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.drawerTitleMain {
+  font-weight: 650;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+  color: #0f172a;
+}
+
+.drawerTitleSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.drawerBody {
+  padding: 10px 12px 14px 12px;
+  overflow: auto;
+}
+
+/* Close button */
+.iconBtn {
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.7);
+  color: #0f172a;
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+}
+
+.iconBtn:hover { background: rgba(255,255,255,0.95); }
+
+/* ---------- Burger / FAB ---------- */
+.fab {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  font-size: 20px;
+
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+}
+
+.fab:hover { background: rgba(15, 23, 42, 0.95); }
+
+/* ---------- Legend UI ---------- */
+#legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.legend-category h3 {
+  margin: 14px 0 8px 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(15, 23, 42, 0.9);
+}
+
+.legend-item {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.70);
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 10px 0;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.10);
+}
+
+.legend-item-title {
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.legend-item-title input[type="checkbox"],
+.legend-item-title input[type="radio"] {
+  transform: scale(1.15);
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.legend-item-menu {
+  display: none;
+  padding: 10px 12px 12px 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.legend-item-menu.open { display: block; }
+
+.legend-item-menu label {
+  display: block;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.75);
+  margin-bottom: 6px;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+/* ---------- Mobile tweaks ---------- */
+@media (max-width: 768px) {
+  #drawer {
+    width: 100vw;
+    max-width: 100vw;
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+}
