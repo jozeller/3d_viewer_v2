@@ -14,7 +14,7 @@ const sanitize = (s) => s.replace(/[^a-zA-Z0-9-_]/g, '-');
 const radioGroups = ['Base Maps'];
 
 // Category display order in the legend
-const categoryOrder = ['Analysis', 'Hazard Maps', 'Base Maps'];
+const categoryOrder = ['Analysis', 'Hazard Maps', 'Base Maps', 'Background'];
 
 export function addLayersToLegend(layerState, viewer) {
   const grouped = layerState.reduce((acc, layer) => {
@@ -67,6 +67,7 @@ function createLayerItem(layer, isRadio, layerState, viewer) {
   const input = document.createElement('input');
   input.type = isRadio ? 'radio' : 'checkbox';
   input.name = isRadio ? `radio-${sanitize(layer.category)}` : '';
+  input.id = `layer-input-${sanitize(layer.key)}`;
   input.checked = !!layer.active;
 
   const layerLabel = document.createElement('span');
@@ -143,4 +144,15 @@ function createCollapsibleBox(layers, isRadio, layerState, viewer) {
   container.appendChild(hiddenLayers);
 
   return container;
+}
+
+// Sync checkbox/radio states with layer.active values
+// Call this after programmatic layer changes (e.g., auto-switch on zoom)
+export function syncLegendCheckboxes(layerState) {
+  for (const layer of layerState) {
+    const input = document.getElementById(`layer-input-${sanitize(layer.key)}`);
+    if (input) {
+      input.checked = !!layer.active;
+    }
+  }
 }

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>3D Viewer</title>
 
   <!-- Cesium (CDN) -->
@@ -30,7 +32,18 @@
     <header class="drawerHeader">
       <div class="drawerBrand">
         <div class="drawerTitleMain">3D Viewer</div>
-        <div class="drawerTitleSub">Layers & Legend</div>
+        <div class="drawerTitleRow">
+          <div id="regionDropdown" class="regionDropdown" aria-label="Select Region">
+            <button id="regionToggle" class="regionToggle" type="button">
+              <span id="regionFlag" class="regionFlag"></span>
+              <span id="regionName" class="regionNameText"></span>
+              <span class="regionArrow">▼</span>
+            </button>
+            <ul id="regionOptions" class="regionOptions is-hidden">
+              <!-- Populated by JS -->
+            </ul>
+          </div>
+        </div>
       </div>
       <div class="drawerHeaderActions">
         <button class="infoBtnHeader" type="button" aria-label="Info" title="How to use">
@@ -238,11 +251,26 @@
     const infoPanel = document.getElementById('infoPanel');
     const authPanelEl = document.getElementById('authPanel');
 
+    // Fix for mobile browsers with dynamic address bar (Chrome on Android, Safari on iOS)
+    // Sets a CSS variable with the actual visible height
+    function setMobileVh() {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    setMobileVh();
+    window.addEventListener('resize', setMobileVh);
+    // Also update on orientation change
+    window.addEventListener('orientationchange', () => {
+      setTimeout(setMobileVh, 100);
+    });
+
     function openDrawer() {
       drawer.classList.remove('is-hidden');
       backdrop.classList.remove('is-hidden');
       document.body.classList.add('drawer-open');
       toggleBurger.style.display = 'none';
+      // Update vh when drawer opens (in case browser UI changed)
+      setMobileVh();
     }
 
     function closeDrawer() {

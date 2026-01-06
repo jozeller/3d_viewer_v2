@@ -1,10 +1,28 @@
-import { layersConfig } from './layersConfig.js';
-import { createViewer, initLayers, performInitialZoom } from './layerManager.js';
-import { addLayersToLegend } from './addLayersToLegend.js';
+import { regions, defaultRegion, getRegion, getRegionList, detectRegionByCoordinates } from './regions/index.js';
+import { createViewer, initLayers, clearAllLayers, updateTerrain, useGlobalTerrain, flyToRegion } from './layerManager.js';
+import { addLayersToLegend, syncLegendCheckboxes } from './addLayersToLegend.js';
 import { initAuthUI } from './auth.js'
 import { supabase } from './supabaseClient.js'
 import { gpx as togeojsonGpx, kml as togeojsonKml } from '@tmcw/togeojson'
 import './styles.css'
+
+// =========================
+// Region State Management
+// =========================
+// Priority: URL param > localStorage > default
+function getInitialRegion() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlRegion = urlParams.get('region')?.toUpperCase();
+  if (urlRegion && regions[urlRegion]) {
+    return urlRegion;
+  }
+  return localStorage.getItem('selectedRegion') || defaultRegion;
+}
+
+let currentRegionCode = getInitialRegion();
+let layerState = null;
+let lastZoomState = null;
+let userSelectedBasemap = null;
 
 // =========================
 // Custom Confirm/Alert Modal
@@ -114,24 +132,199 @@ supabase.auth.onAuthStateChange((_event, _session) => {
 document.addEventListener('DOMContentLoaded', updateAuthState);
 
 
-// Create viewer (terrain, basic UI config)
-const viewer = createViewer('cesiumContainer', 'invisibleCredits');
+// =========================
+// Region Selector Setup
+// =========================
+const regionDropdown = document.getElementById('regionDropdown');
+const regionToggle = document.getElementById('regionToggle');
+const regionOptions = document.getElementById('regionOptions');
+const regionFlagEl = document.getElementById('regionFlag');
+const regionNameEl = document.getElementById('regionName');
 
-// Initial camera (Switzerland)
+// Helper: Extract first coordinate from GeoJSON and detect region
+function detectRegionFromGeoJson(geoJson) {
+  try {
+    let coords = null;
+    
+    // Handle different GeoJSON structures
+    if (geoJson.type === 'FeatureCollection' && geoJson.features?.length > 0) {
+      const geom = geoJson.features[0].geometry;
+      if (geom.type === 'LineString') coords = geom.coordinates[0];
+      else if (geom.type === 'MultiLineString') coords = geom.coordinates[0][0];
+      else if (geom.type === 'Point') coords = geom.coordinates;
+    } else if (geoJson.type === 'Feature') {
+      const geom = geoJson.geometry;
+      if (geom.type === 'LineString') coords = geom.coordinates[0];
+      else if (geom.type === 'MultiLineString') coords = geom.coordinates[0][0];
+      else if (geom.type === 'Point') coords = geom.coordinates;
+    } else if (geoJson.type === 'LineString') {
+      coords = geoJson.coordinates[0];
+    }
+    
+    if (coords && coords.length >= 2) {
+      const [longitude, latitude] = coords;
+      return detectRegionByCoordinates(longitude, latitude);
+    }
+  } catch (err) {
+    console.warn('Could not detect region from GeoJSON:', err);
+  }
+  return null;
+}
+
+function populateRegionSelect() {
+  const regionList = getRegionList();
+  const currentRegion = getRegion(currentRegionCode);
+  
+  // Update toggle button
+  regionFlagEl.innerHTML = `<img src="${currentRegion.flag}" alt="${currentRegion.code}" class="regionFlagImg">`;
+  regionNameEl.textContent = currentRegion.name;
+  
+  // Populate options list
+  regionOptions.innerHTML = regionList.map(r => 
+    `<li class="regionOption ${r.code === currentRegionCode ? 'is-selected' : ''}" data-code="${r.code}">
+      <span class="regionFlag"><img src="${r.flag}" alt="${r.code}" class="regionFlagImg"></span>
+      <span class="regionNameText">${r.name}</span>
+    </li>`
+  ).join('');
+  
+  // Add click handlers to options
+  regionOptions.querySelectorAll('.regionOption').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const code = opt.dataset.code;
+      regionOptions.classList.add('is-hidden');
+      if (code !== currentRegionCode) {
+        switchRegion(code);
+        populateRegionSelect(); // Update UI
+      }
+    });
+  });
+}
+
+// Toggle dropdown open/close
+regionToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  regionOptions.classList.toggle('is-hidden');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!regionDropdown.contains(e.target)) {
+    regionOptions.classList.add('is-hidden');
+  }
+});
+
+function switchRegion(regionCode) {
+  const region = getRegion(regionCode);
+  if (!region) return;
+  
+  currentRegionCode = regionCode;
+  localStorage.setItem('selectedRegion', regionCode);
+  
+  // Update URL without reload
+  const url = new URL(window.location);
+  url.searchParams.set('region', regionCode);
+  window.history.replaceState({}, '', url);
+  
+  // Reset zoom state tracking for new region
+  lastZoomState = null;
+  userSelectedBasemap = null;
+  
+  // Clear existing layers
+  clearAllLayers(viewer);
+  
+  // Update terrain
+  updateTerrain(viewer, region.terrain);
+  
+  // Re-init layers with new region config
+  layerState = initLayers(viewer, region.layers);
+  
+  // Rebuild legend UI
+  const legendEl = document.getElementById('legend');
+  legendEl.innerHTML = '';
+  addLayersToLegend(layerState, viewer);
+  
+  // Fly to new region
+  flyToRegion(viewer, region.initialView);
+}
+
+// Init region selector
+populateRegionSelect();
+
+// Get initial region config
+const initialRegion = getRegion(currentRegionCode);
+
+// Create viewer (terrain, basic UI config)
+const viewer = createViewer('cesiumContainer', 'invisibleCredits', initialRegion.terrain);
+
+// Initial camera position from region config
 viewer.camera.setView({
-  destination: Cesium.Cartesian3.fromDegrees(8.1355, 46.4754, 400000),
+  destination: Cesium.Cartesian3.fromDegrees(
+    initialRegion.initialView.longitude,
+    initialRegion.initialView.latitude,
+    initialRegion.initialView.height
+  ),
   orientation: {
-    heading: Cesium.Math.toRadians(0),
-    pitch: Cesium.Math.toRadians(-90),
-    roll: 0
+    heading: Cesium.Math.toRadians(initialRegion.initialView.heading || 0),
+    pitch: Cesium.Math.toRadians(initialRegion.initialView.pitch || -90),
+    roll: initialRegion.initialView.roll || 0
   }
 });
 
 // Init layers (adds only active layers, keeps references)
-const layerState = initLayers(viewer, layersConfig);
+layerState = initLayers(viewer, initialRegion.layers);
 
 // Legend UI binds to layerState operations
 addLayersToLegend(layerState, viewer);
+
+// =========================
+// Auto-activate Global Satellite when zoomed out beyond threshold
+// Once activated, stays active until user manually disables it
+// =========================
+const ZOOM_OUT_THRESHOLD = 50000; // meters - activate satellite above this height
+
+function getGlobalFallbackLayer() {
+  return layerState.find(l => l.isGlobalFallback);
+}
+
+// =========================
+// Auto-switch terrain when outside region bounds
+// Uses Cesium World Terrain globally, regional terrain when inside bounds
+// =========================
+let usingGlobalTerrain = false;
+
+function isInsideRegionBounds(lon, lat, bounds) {
+  if (!bounds) return true; // No bounds defined = always "inside"
+  return lon >= bounds.west && lon <= bounds.east && 
+         lat >= bounds.south && lat <= bounds.north;
+}
+
+viewer.camera.changed.addEventListener(() => {
+  const height = viewer.camera.positionCartographic.height;
+  const lon = Cesium.Math.toDegrees(viewer.camera.positionCartographic.longitude);
+  const lat = Cesium.Math.toDegrees(viewer.camera.positionCartographic.latitude);
+  
+  // Auto-activate satellite layer when zoomed out
+  const fallbackLayer = getGlobalFallbackLayer();
+  if (fallbackLayer && height > ZOOM_OUT_THRESHOLD && !fallbackLayer.active) {
+    fallbackLayer.active = true;
+    if (fallbackLayer.viewerLayer) fallbackLayer.viewerLayer.show = true;
+    syncLegendCheckboxes(layerState);
+  }
+  
+  // Auto-switch terrain based on whether camera is inside region bounds
+  const currentRegion = getRegion(currentRegionCode);
+  const insideBounds = isInsideRegionBounds(lon, lat, currentRegion?.bounds);
+  
+  if (!insideBounds && !usingGlobalTerrain) {
+    // Moved outside region - switch to global terrain
+    useGlobalTerrain(viewer);
+    usingGlobalTerrain = true;
+  } else if (insideBounds && usingGlobalTerrain) {
+    // Moved back inside region - restore regional terrain
+    updateTerrain(viewer, currentRegion?.terrain);
+    usingGlobalTerrain = false;
+  }
+});
 
 // My Tours UI
 const navLegend = document.getElementById('navLegend');
@@ -191,8 +384,18 @@ function hideCreateTourForm() {
 createTourBtn.addEventListener('click', showCreateTourForm);
 cancelTourBtn.addEventListener('click', hideCreateTourForm);
 
-navLegend.addEventListener('click', showLegend);
-navMyTours.addEventListener('click', showMyTours);
+// Navigation tabs - use both click and touchend for better mobile support
+function handleNavLegend(e) {
+  e.preventDefault();
+  showLegend();
+}
+function handleNavMyTours(e) {
+  e.preventDefault();
+  showMyTours();
+}
+
+navLegend.addEventListener('click', handleNavLegend);
+navMyTours.addEventListener('click', handleNavMyTours);
 
 async function currentUser() {
   const { data } = await supabase.auth.getUser();
@@ -201,42 +404,82 @@ async function currentUser() {
 
 async function loadMyTours() {
   toursList.innerHTML = 'Loading...';
-  const user = await currentUser();
-  if (!user) { toursList.innerHTML = 'Please log in to see your tours.'; return }
-
-  // owned tours
-  const { data: owned, error: e1 } = await supabase
-    .from('tours')
-    .select('*')
-    .eq('owner_id', user.id)
-    .order('created_at', { ascending: false });
-
-  // member tours
-  const { data: memberships } = await supabase
-    .from('tour_members')
-    .select('tour_id')
-    .eq('user_id', user.id);
-
-  let memberTours = [];
-  if (memberships && memberships.length) {
-    const ids = memberships.map(m => m.tour_id).join(',');
-    const { data } = await supabase.from('tours').select('*').in('id', memberships.map(m => m.tour_id));
-    memberTours = data || [];
-  }
-
-  // Mark owned vs member tours
-  const ownedWithFlag = (owned || []).map(t => ({ ...t, isOwner: true }));
-  const memberWithFlag = memberTours.map(t => ({ ...t, isOwner: false }));
   
-  const all = [...ownedWithFlag, ...memberWithFlag];
-  if (!all.length) { toursList.innerHTML = '<div>No tours yet.</div>'; return }
+  try {
+    const user = await currentUser();
+    console.log('loadMyTours: user =', user?.id || 'none');
+    
+    if (!user) { 
+      toursList.innerHTML = 'Please log in to see your tours.'; 
+      return;
+    }
 
-  // Get member counts for all tours
-  const tourMemberCounts = {};
-  for (const t of all) {
-    const { data: count } = await supabase.rpc('get_tour_member_count', { p_tour_id: t.id });
-    tourMemberCounts[t.id] = count || 0;
-  }
+    // owned tours
+    console.log('loadMyTours: fetching owned tours...');
+    const { data: owned, error: e1 } = await supabase
+      .from('tours')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    console.log('loadMyTours: owned tours =', owned?.length || 0, 'error =', e1?.message || 'none');
+    
+    if (e1) {
+      console.error('Error loading owned tours:', e1);
+      toursList.innerHTML = `Error loading tours: ${e1.message}`;
+      return;
+    }
+
+    // member tours
+    console.log('loadMyTours: fetching memberships...');
+    const { data: memberships, error: e2 } = await supabase
+      .from('tour_members')
+      .select('tour_id')
+      .eq('user_id', user.id);
+    
+    console.log('loadMyTours: memberships =', memberships?.length || 0);
+    
+    if (e2) {
+      console.error('Error loading memberships:', e2);
+    }
+
+    let memberTours = [];
+    if (memberships && memberships.length) {
+      const { data, error: e3 } = await supabase
+        .from('tours')
+        .select('*')
+        .in('id', memberships.map(m => m.tour_id));
+      if (e3) {
+        console.error('Error loading member tours:', e3);
+      }
+      memberTours = data || [];
+    }
+
+    // Mark owned vs member tours
+    const ownedWithFlag = (owned || []).map(t => ({ ...t, isOwner: true }));
+    const memberWithFlag = memberTours.map(t => ({ ...t, isOwner: false }));
+    
+    const all = [...ownedWithFlag, ...memberWithFlag];
+    console.log('loadMyTours: total tours =', all.length);
+    
+    if (!all.length) { 
+      toursList.innerHTML = '<div>No tours yet.</div>'; 
+      return;
+    }
+
+    // Get member counts for all tours (don't block on errors)
+    const tourMemberCounts = {};
+    await Promise.all(all.map(async (t) => {
+      try {
+        const { data: count, error } = await supabase.rpc('get_tour_member_count', { p_tour_id: t.id });
+        tourMemberCounts[t.id] = error ? 0 : (count || 0);
+      } catch (err) {
+        console.warn('Could not get member count for tour', t.id);
+        tourMemberCounts[t.id] = 0;
+      }
+    }));
+    
+    console.log('loadMyTours: rendering tours...');
 
   toursList.innerHTML = '';
   for (const t of all) {
@@ -387,7 +630,7 @@ async function loadMyTours() {
       statusSpan.textContent = 'Uploading...';
       statusSpan.style.color = 'blue';
       try {
-        await handleFileUpload(file, t.id);
+        await handleFileUpload(file, t.id, t.isOwner);
         statusSpan.textContent = '✓ Uploaded';
         statusSpan.style.color = 'green';
         setTimeout(() => { statusSpan.textContent = ''; }, 3000);
@@ -559,7 +802,7 @@ async function loadMyTours() {
     }
 
     // load tracks for this tour, then auto-show if tour is open
-    loadTracksForTour(t.id).then(() => {
+    loadTracksForTour(t.id, t.isOwner).then(() => {
       // If this tour is open (new tour), close others and show its tracks
       if (!content.classList.contains('is-hidden')) {
         closeAllToursExcept(t.id);
@@ -567,9 +810,13 @@ async function loadMyTours() {
       }
     });
   }
+  } catch (err) {
+    console.error('Error in loadMyTours:', err);
+    toursList.innerHTML = `<div style="color: red;">Error: ${err.message || 'Unknown error'}</div>`;
+  }
 }
 
-async function loadTracksForTour(tourId) {
+async function loadTracksForTour(tourId, isTourOwner = false) {
   const container = document.getElementById(`tracks-${tourId}`);
   container.innerHTML = 'Loading...';
   // get tracks for user and filter by tour
@@ -578,20 +825,29 @@ async function loadTracksForTour(tourId) {
   const tracks = (data || []).filter(r => r.tour_id === tourId);
   if (!tracks.length) { container.innerHTML = '<div>No tracks</div>'; return }
   container.innerHTML = '';
+  // Get current user ID to check track ownership
+  const currentUserId = (await supabase.auth.getUser())?.data?.user?.id;
   for (const tr of tracks) {
     const row = document.createElement('div');
     row.className = 'trackRow';
     const trackName = tr.name || new Date(tr.created_at).toLocaleString();
     // Default color for track (use property or fallback to tour color)
     const defaultColor = tr.color || pickColorForTourHex(tr.id);
+    // Permission: can delete if tour owner OR track creator
+    const canDelete = isTourOwner || (tr.user_id === currentUserId);
+    // Permission: can edit only if track creator
+    const canEdit = (tr.user_id === currentUserId);
     row.innerHTML = `
       <div class="trackRowContent">
         <label><input type="checkbox" class="trackToggle" data-track="${tr.id}" /> <span class="trackName" data-track="${tr.id}" data-editable="false">${trackName}</span></label>
         <div class="trackRowIcons">
           <button class="iconBtn trackColorBtn" data-track="${tr.id}" title="Choose color">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="${defaultColor}"/>
-              <path d="M7 16c.6-1.9 2.4-3.8 5-3.8s4.4 1.9 5 3.8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9z" fill="${defaultColor}" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="7.5" cy="11.5" r="1.5" fill="#ef4444"/>
+              <circle cx="11" cy="7.5" r="1.5" fill="#eab308"/>
+              <circle cx="15" cy="8.5" r="1.5" fill="#22c55e"/>
+              <circle cx="17" cy="12" r="1.5" fill="#3b82f6"/>
             </svg>
           </button>
           <input type="color" class="trackColorPicker srColorInput" data-track="${tr.id}" value="${defaultColor}" aria-label="Select track color" />
@@ -601,9 +857,9 @@ async function loadTracksForTour(tourId) {
             </button>
             <ul class="trackMenu is-hidden" data-track="${tr.id}">
               <li class="trackMenuDownload" data-track="${tr.id}" data-original="${tr.original_file_path || ''}">Download GPX</li>
-              <li class="trackMenuEdit" data-track="${tr.id}">Edit</li>
+              ${canEdit ? `<li class="trackMenuEdit" data-track="${tr.id}">Edit</li>` : ''}
               <li class="trackMenuCenter" data-track="${tr.id}">Center</li>
-              <li class="trackMenuDelete" data-track="${tr.id}">Delete</li>
+              ${canDelete ? `<li class="trackMenuDelete" data-track="${tr.id}">Delete</li>` : ''}
             </ul>
           </div>
         </div>
@@ -629,7 +885,8 @@ async function loadTracksForTour(tourId) {
     });
     colorInput.addEventListener('input', () => {
       currentColor = colorInput.value;
-      colorBtn.querySelector('circle').setAttribute('fill', currentColor);
+      // Update the palette background (the path element)
+      colorBtn.querySelector('path').setAttribute('fill', currentColor);
       const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
       if (ds) {
         ds.entities.values.forEach(ent => {
@@ -642,24 +899,41 @@ async function loadTracksForTour(tourId) {
 
     cb.addEventListener('change', async (e) => {
       if (e.target.checked) {
-        // add to cesium (2D draped)
-        const geoJson = typeof tr.geo === 'string' ? JSON.parse(tr.geo) : tr.geo;
-        const ds = await Cesium.GeoJsonDataSource.load(geoJson);
-        ds.name = `track-${tr.id}`;
-        viewer.dataSources.add(ds);
-        // color by track
-        const color = Cesium.Color.fromCssColorString(colorInput.value || currentColor).withAlpha(0.95);
-        ds.entities.values.forEach(ent => {
-          if (ent.polyline) {
-            ent.polyline.material = color;
-            ent.polyline.width = 6;
-            ent.polyline.clampToGround = true;
-            ent.properties = ent.properties || {};
-            ent.properties.trackId = tr.id;
+        // Check if already loaded (avoid duplicates)
+        let ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
+        if (!ds) {
+          // add to cesium (2D draped)
+          const geoJson = typeof tr.geo === 'string' ? JSON.parse(tr.geo) : tr.geo;
+          
+          // Auto-detect region from track coordinates and switch if needed
+          // Skip if already handled at tour level (e.skipRegionSwitch)
+          if (!e.skipRegionSwitch) {
+            const trackRegion = detectRegionFromGeoJson(geoJson);
+            if (trackRegion && trackRegion !== currentRegionCode) {
+              switchRegion(trackRegion);
+              populateRegionSelect(); // Update dropdown UI
+            }
           }
-        });
-        // Zoom to track with smart positioning
-        zoomToTrack(ds, tr.id);
+          
+          ds = await Cesium.GeoJsonDataSource.load(geoJson);
+          ds.name = `track-${tr.id}`;
+          viewer.dataSources.add(ds);
+          // color by track
+          const color = Cesium.Color.fromCssColorString(colorInput.value || currentColor).withAlpha(0.95);
+          ds.entities.values.forEach(ent => {
+            if (ent.polyline) {
+              ent.polyline.material = color;
+              ent.polyline.width = 6;
+              ent.polyline.clampToGround = true;
+              ent.properties = ent.properties || {};
+              ent.properties.trackId = tr.id;
+            }
+          });
+          // Only zoom if this is a single track toggle (not batch), check via custom flag
+          if (!e.skipZoom) {
+            zoomToTrack(ds, tr.id);
+          }
+        }
       } else {
         // remove dataSource by name
         const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
@@ -734,35 +1008,17 @@ async function loadTracksForTour(tourId) {
         });
       }
     });
-    // Editieren
-    menu.querySelector('.trackMenuEdit').addEventListener('click', async () => {
-      menu.classList.add('is-hidden');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      const isEditing = nameSpan.getAttribute('data-editable') === 'true';
-      if (isEditing) {
-        // save
-        const newName = nameSpan.textContent.trim();
-        if (newName) {
-          const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
-          if (error) {
-            await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
-            return;
-          }
-          tr.name = newName;
-        }
-        nameSpan.contentEditable = 'false';
-        nameSpan.setAttribute('data-editable', 'false');
-      } else {
-        // enter edit mode
-        nameSpan.contentEditable = 'true';
-        nameSpan.setAttribute('data-editable', 'true');
-        nameSpan.focus();
-        // Save on blur or enter
-        const saveEdit = async () => {
-          nameSpan.contentEditable = 'false';
-          nameSpan.setAttribute('data-editable', 'false');
+    // Editieren (only if canEdit)
+    const editMenuItem = menu.querySelector('.trackMenuEdit');
+    if (editMenuItem) {
+      editMenuItem.addEventListener('click', async () => {
+        menu.classList.add('is-hidden');
+        menuBtn.setAttribute('aria-expanded', 'false');
+        const isEditing = nameSpan.getAttribute('data-editable') === 'true';
+        if (isEditing) {
+          // save
           const newName = nameSpan.textContent.trim();
-          if (newName && newName !== tr.name) {
+          if (newName) {
             const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
             if (error) {
               await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
@@ -770,16 +1026,37 @@ async function loadTracksForTour(tourId) {
             }
             tr.name = newName;
           }
-        };
-        nameSpan.addEventListener('blur', saveEdit, { once: true });
-        nameSpan.addEventListener('keydown', async (ev) => {
-          if (ev.key === 'Enter') {
-            ev.preventDefault();
-            nameSpan.blur();
-          }
-        }, { once: true });
-      }
-    });
+          nameSpan.contentEditable = 'false';
+          nameSpan.setAttribute('data-editable', 'false');
+        } else {
+          // enter edit mode
+          nameSpan.contentEditable = 'true';
+          nameSpan.setAttribute('data-editable', 'true');
+          nameSpan.focus();
+          // Save on blur or enter
+          const saveEdit = async () => {
+            nameSpan.contentEditable = 'false';
+            nameSpan.setAttribute('data-editable', 'false');
+            const newName = nameSpan.textContent.trim();
+            if (newName && newName !== tr.name) {
+              const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
+              if (error) {
+                await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
+                return;
+              }
+              tr.name = newName;
+            }
+          };
+          nameSpan.addEventListener('blur', saveEdit, { once: true });
+          nameSpan.addEventListener('keydown', async (ev) => {
+            if (ev.key === 'Enter') {
+              ev.preventDefault();
+              nameSpan.blur();
+            }
+          }, { once: true });
+        }
+      });
+    }
     // Zentrieren
     menu.querySelector('.trackMenuCenter').addEventListener('click', () => {
       menu.classList.add('is-hidden');
@@ -788,44 +1065,47 @@ async function loadTracksForTour(tourId) {
       const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
       if (ds) zoomToTrack(ds, tr.id);
     });
-    // Löschen
-    menu.querySelector('.trackMenuDelete').addEventListener('click', async () => {
-      menu.classList.add('is-hidden');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      
-      const confirmed = await showConfirm({
-        title: 'Delete Track',
-        message: `Delete track "${tr.name || 'Unnamed'}"?\n\nThis cannot be undone.`,
-        icon: '🗑️',
-        variant: 'danger',
-        confirmText: 'Delete',
-        confirmStyle: 'danger'
-      });
-      if (!confirmed) return;
-      
-      // Delete original file from storage if it exists
-      const originalPath = tr.original_file_path;
-      if (originalPath) {
-        const { error: storageError } = await supabase.storage
-          .from('tracks')
-          .remove([originalPath]);
-        if (storageError) {
-          console.warn('Could not delete original file from storage:', storageError);
-          // Continue with DB deletion anyway
+    // Löschen (only if canDelete)
+    const deleteMenuItem = menu.querySelector('.trackMenuDelete');
+    if (deleteMenuItem) {
+      deleteMenuItem.addEventListener('click', async () => {
+        menu.classList.add('is-hidden');
+        menuBtn.setAttribute('aria-expanded', 'false');
+        
+        const confirmed = await showConfirm({
+          title: 'Delete Track',
+          message: `Delete track "${tr.name || 'Unnamed'}"?\n\nThis cannot be undone.`,
+          icon: '🗑️',
+          variant: 'danger',
+          confirmText: 'Delete',
+          confirmStyle: 'danger'
+        });
+        if (!confirmed) return;
+        
+        // Delete original file from storage if it exists
+        const originalPath = tr.original_file_path;
+        if (originalPath) {
+          const { error: storageError } = await supabase.storage
+            .from('tracks')
+            .remove([originalPath]);
+          if (storageError) {
+            console.warn('Could not delete original file from storage:', storageError);
+            // Continue with DB deletion anyway
+          }
         }
-      }
-      
-      const { error } = await supabase.from('tour_tracks').delete().eq('id', tr.id);
-      if (error) {
-        await showAlert({ title: 'Delete Failed', message: error.message, icon: '❌', variant: 'danger' });
-        return;
-      }
-      // remove from map
-      const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
-      if (ds) viewer.dataSources.remove(ds, true);
-      // refresh list
-      loadTracksForTour(tourId);
-    });
+        
+        const { error } = await supabase.from('tour_tracks').delete().eq('id', tr.id);
+        if (error) {
+          await showAlert({ title: 'Delete Failed', message: error.message, icon: '❌', variant: 'danger' });
+          return;
+        }
+        // remove from map
+        const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
+        if (ds) viewer.dataSources.remove(ds, true);
+        // refresh list
+        loadTracksForTour(tourId, isTourOwner);
+      });
+    }
   }
 }
 
@@ -979,11 +1259,50 @@ async function autoShowAllTracks(tourId) {
   if (!container) return;
   
   const checkboxes = container.querySelectorAll('.trackToggle');
+  let anyNewlyShown = false;
+  
+  // Before loading tracks, detect region from first track and switch if needed
+  if (checkboxes.length > 0) {
+    const firstTrackId = checkboxes[0].dataset.track;
+    await detectAndSwitchRegionForTour(tourId, firstTrackId);
+  }
+  
   for (const cb of checkboxes) {
     if (!cb.checked) {
       cb.checked = true;
-      cb.dispatchEvent(new Event('change'));
+      // Create event with skipZoom flag to avoid zooming on each track
+      const event = new Event('change');
+      event.skipZoom = true;
+      event.skipRegionSwitch = true; // Skip region detection since we already did it
+      cb.dispatchEvent(event);
+      anyNewlyShown = true;
     }
+  }
+  
+  // If any tracks were newly shown, zoom to fit all visible tracks for this tour
+  if (anyNewlyShown) {
+    // Small delay to let all dataSources load
+    await new Promise(r => setTimeout(r, 100));
+    zoomToAllVisibleTracks(tourId);
+  }
+}
+
+// Detect region from track data and switch if tour is in a different region
+async function detectAndSwitchRegionForTour(tourId, trackId) {
+  try {
+    // Get track stats which include coordinates
+    const { data: stats, error } = await supabase.rpc('get_track_view_stats', { p_track_id: trackId });
+    if (error || !stats) return;
+    
+    // Detect region from center coordinates
+    const detectedRegion = detectRegionByCoordinates(stats.center_lon, stats.center_lat);
+    
+    if (detectedRegion && detectedRegion !== currentRegionCode) {
+      switchRegion(detectedRegion);
+      populateRegionSelect(); // Update dropdown UI
+    }
+  } catch (err) {
+    console.warn('Could not auto-detect region for tour:', err);
   }
 }
 
@@ -1125,6 +1444,27 @@ function zoomToTrackFallback(dataSource) {
   }
 }
 
+// Zoom to fit all visible tracks for a tour - uses same behavior as clicking the first (topmost) track
+function zoomToAllVisibleTracks(tourId) {
+  const container = document.getElementById(`tracks-${tourId}`);
+  if (!container) return;
+  
+  const checkboxes = container.querySelectorAll('.trackToggle:checked');
+  if (checkboxes.length === 0) return;
+  
+  // Use the first (topmost) visible track for zoom behavior
+  const firstTrackId = checkboxes[0].dataset.track;
+  const ds = viewer.dataSources.getByName(`track-${firstTrackId}`)[0];
+  
+  // Zoom to the first track - this gives the same behavior as clicking on that track
+  if (ds) {
+    zoomToTrack(ds, firstTrackId);
+  } else {
+    // Fallback: just use smart zoom with trackId
+    zoomToTrackSmart(firstTrackId);
+  }
+}
+
 // New tour form
 newTourForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1214,7 +1554,7 @@ async function parseFileToGeoJSON(file) {
   }
 }
 
-async function handleFileUpload(file, tourId) {
+async function handleFileUpload(file, tourId, isTourOwner = false) {
   if (!file) throw new Error('No file provided');
   
   const geojson = await parseFileToGeoJSON(file);
@@ -1263,40 +1603,17 @@ async function handleFileUpload(file, tourId) {
   const trackData = tracks.find(t => t.id === insertedId);
   if (!trackData) throw new Error('Uploaded track not found in list');
   
-  // load into Cesium and zoom (2D draped)
-  // trackData.geo comes from ST_AsGeoJSON()::json which returns an object in Supabase
-  const geoJson = typeof trackData.geo === 'string' ? JSON.parse(trackData.geo) : trackData.geo;
-  const ds = await Cesium.GeoJsonDataSource.load(geoJson);
-  ds.name = `track-${trackData.id}`;
-  viewer.dataSources.add(ds);
+  // refresh tracks list to show new track
+  await loadTracksForTour(tourId, isTourOwner);
   
-  // color
-  const color = Cesium.Color.fromCssColorString(pickColorForTour(tourId)).withAlpha(0.95);
-  const tourColorPicker = document.querySelector(`.tourColorPicker[data-tour="${tourId}"]`);
-  const customColor = tourColorPicker ? tourColorPicker.value : null;
-  const finalColor = customColor ? Cesium.Color.fromCssColorString(customColor).withAlpha(0.95) : color;
-  
-  ds.entities.values.forEach(ent => { 
-    if (ent.polyline) { 
-      ent.polyline.material = finalColor; 
-      ent.polyline.width = 6;
-      ent.polyline.clampToGround = true; // 2D draped
-      // Add properties for highlighting
-      ent.properties = ent.properties || {};
-      ent.properties.highlighted = false;
-      ent.properties.tourId = tourId;
-      ent.properties.trackId = trackData.id;
-    } 
-  });
-  
-  // Zoom to track with smart positioning
-  zoomToTrack(ds, trackData.id);
-  
-  // refresh tracks list to show new track, then check the new track's checkbox
-  await loadTracksForTour(tourId);
+  // activate the new track's checkbox (this will add to Cesium and zoom)
   const newCb = document.querySelector(`.trackToggle[data-track="${trackData.id}"]`);
-  if (newCb) newCb.checked = true;
+  if (newCb && !newCb.checked) {
+    newCb.checked = true;
+    newCb.dispatchEvent(new Event('change')); // This will zoom to the track
+  }
 }
+
 // Initialize authentication UI
 initAuthUI()
 
@@ -1307,14 +1624,14 @@ viewer.scene.globe.preloadSiblings = true;
 viewer.scene.globe.tileLoadProgressEvent.addEventListener((current) => {
   if (!initialZoomPerformed && current === 0) {
     initialZoomPerformed = true;
-    performInitialZoom(viewer);
+    flyToRegion(viewer, getRegion(currentRegionCode).initialView);
   }
 });
 
 // Override Home button
 viewer.homeButton.viewModel.command.beforeExecute.addEventListener((event) => {
   event.cancel = true;
-  performInitialZoom(viewer);
+  flyToRegion(viewer, getRegion(currentRegionCode).initialView);
 });
 
 // =========================

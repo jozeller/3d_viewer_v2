@@ -3,7 +3,7 @@
    ========================= */
 :root {
   /* Primary brand color (blue) */
-  --color-primary: rgb(67, 164, 243);
+  --color-primary: #43a4f3;
   --color-primary-rgb: 67, 164, 243;
   
   /* Text colors (dark slate) */
@@ -144,7 +144,13 @@ body {
   position: fixed;
   top: 0;
   left: 0;
+  /* Use multiple fallbacks for mobile browser compatibility:
+     1. 100vh - works everywhere but problematic on mobile
+     2. 100dvh - dynamic viewport height (modern browsers)
+     3. calc(var(--vh, 1vh) * 100) - JS-calculated fallback for older mobile browsers */
   height: 100vh;
+  height: 100dvh;
+  height: calc(var(--vh, 1vh) * 100);
   width: 400px;
   max-width: 92vw;
   z-index: 1000;
@@ -197,6 +203,112 @@ body {
   margin-top: 2px;
   font-size: 13px;
   color: rgba(var(--color-text-rgb), 0.65);
+}
+
+.drawerTitleRow {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Region selector custom dropdown */
+.regionDropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.regionToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-muted);
+  border: 1px solid rgba(var(--color-text-rgb), 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.regionToggle:hover {
+  border-color: rgba(var(--color-primary-rgb), 0.5);
+}
+
+.regionToggle:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.regionFlag {
+  display: flex;
+  align-items: center;
+}
+
+.regionFlagImg {
+  width: 20px;
+  height: auto;
+  border-radius: 2px;
+  box-shadow: 0 0 1px rgba(0,0,0,0.3);
+}
+
+.regionNameText {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.regionArrow {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.regionOptions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-bg-surface);
+  border: 1px solid rgba(var(--color-text-rgb), 0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  padding: 4px 0;
+  min-width: 140px;
+  z-index: 100;
+}
+
+.regionOptions.is-hidden {
+  display: none;
+}
+
+.regionOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.regionOption:hover {
+  background: var(--color-bg-muted);
+}
+
+.regionOption.is-selected {
+  background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.regionOption .regionFlag {
+  display: flex;
+  align-items: center;
+}
+
+.regionOption .regionNameText {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* =========================
@@ -306,7 +418,7 @@ body.drawer-open .fab {
   font-size: 13px;
   line-height: 1.5;
   color: rgba(var(--color-text-rgb), 0.8);
-  z-index: 1100;
+  /* Don't use z-index - let normal flow handle stacking */
 }
 
 .infoPanelContent p {
@@ -917,25 +1029,32 @@ body.drawer-open .fab {
    Navigation Tabs (Legend / My Tours)
    ========================= */
 .drawer-nav {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0;
+  display: flex;
+  gap: 4px;
   margin-bottom: 14px;
   background: rgba(var(--color-text-rgb), 0.06);
   border-radius: 999px;
   padding: 4px;
+  position: relative;
+  z-index: 10;
 }
 
 .navBtn {
+  flex: 1;
   border: none;
   background: transparent;
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
   color: rgba(var(--color-text-rgb), 0.7);
   transition: all 0.2s ease;
+  /* Better touch targets */
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .navBtn:hover {
@@ -1391,12 +1510,162 @@ body.drawer-open .fab {
    Mobile
    ========================= */
 @media (max-width: 768px) {
+  /* Drawer takes full width on mobile */
   #drawer {
     width: 100vw;
     max-width: 100vw;
+    padding-top: 0;
+    /* Critical: Use multiple height fallbacks for mobile browsers */
+    height: 100vh;
+    height: 100dvh;
+    height: calc(var(--vh, 1vh) * 100);
+  }
+  
+  /* Ensure drawer uses safe area on notched devices */
+  #drawer {
+    padding-top: env(safe-area-inset-top, 8px);
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
+  /* FAB position when drawer is open */
   body.drawer-open .fab {
     left: calc(100vw - 58px);
+  }
+  
+  /* Drawer header adjustments */
+  .drawerHeader {
+    padding: 12px 12px 10px 16px;
+    min-height: 50px;
+  }
+  
+  .drawerTitleMain {
+    font-size: 18px;
+  }
+  
+  .drawerTitleSub {
+    font-size: 11px;
+  }
+  
+  /* Ensure footer is always visible */
+  .drawerFooter {
+    flex-shrink: 0;
+    padding: 12px 16px 16px 16px;
+    background: var(--color-bg-drawer);
+    border-top: 1px solid rgba(var(--color-text-rgb), 0.08);
+  }
+  
+  /* Make scroll section not overflow */
+  .sectionScroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Auth footer: ensure login button is prominent */
+  .authFooterRow {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .authFooterRow .pillBtn {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+  }
+  
+  /* Auth panel: better mobile layout */
+  .authPanel {
+    padding: 12px 16px;
+  }
+  
+  .authBox {
+    padding: 16px;
+  }
+  
+  .authInput {
+    padding: 12px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Tour items: more touch-friendly */
+  .tourItem {
+    margin-bottom: 12px;
+  }
+  
+  .tourHeader {
+    padding: 14px 12px;
+    min-height: 48px;
+  }
+  
+  .trackRow {
+    padding: 10px 12px;
+  }
+  
+  /* Buttons: larger touch targets */
+  .iconBtn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .navBtn {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  
+  /* Legend items */
+  .legendGroup summary {
+    padding: 12px 10px;
+  }
+  
+  .legendEntry label {
+    padding: 10px 8px;
+  }
+  
+  /* Modals: better mobile display */
+  .confirmModalContent {
+    width: 90vw;
+    max-width: 340px;
+    margin: 20px;
+  }
+  
+  #shareModal .modal-content {
+    width: 90vw;
+    max-width: 360px;
+    margin: 20px;
+  }
+  
+  /* Upload button */
+  .uploadLabel {
+    padding: 12px 16px;
+  }
+}
+
+/* Extra small screens (phones in portrait) */
+@media (max-width: 480px) {
+  .drawerHeader {
+    padding: 10px 10px 8px 12px;
+  }
+  
+  .drawerTitleMain {
+    font-size: 16px;
+  }
+  
+  /* Stack auth footer vertically if needed */
+  .authFooterRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .authFooterIdentity {
+    max-width: 100%;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  
+  /* Make buttons full width */
+  .authFooterRow .pillBtn,
+  .authFooterRow .pillBtnDanger {
+    width: 100%;
   }
 }

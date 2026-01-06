@@ -239,10 +239,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP FUNCTION IF EXISTS public.get_tracks_for_user() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.get_tracks_for_user()
-RETURNS TABLE(id uuid, tour_id uuid, name text, geo json, original_file_path text, created_at timestamptz) AS $$
+RETURNS TABLE(id uuid, tour_id uuid, name text, geo json, original_file_path text, created_at timestamptz, user_id uuid) AS $$
 BEGIN
   RETURN QUERY
-  SELECT t.id, t.tour_id, t.name, ST_AsGeoJSON(t.track)::json, t.original_file_path, t.created_at
+  SELECT t.id, t.tour_id, t.name, ST_AsGeoJSON(t.track)::json, t.original_file_path, t.created_at, t.user_id
   FROM public.tour_tracks t
   WHERE (
     t.user_id = auth.uid()

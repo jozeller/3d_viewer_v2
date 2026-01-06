@@ -2,20 +2,78 @@
 // Central place for Cesium viewer + imagery layer lifecycle.
 // Keeps layers, toggles visibility without removing, and enforces deterministic ordering.
 
-export function createViewer(containerId, creditsContainerId) {
+let currentViewer = null;
+
+export function createViewer(containerId, creditsContainerId, terrainConfig) {
+  // Set Cesium Ion token if available (required for geocoder/search)
+  const cesiumToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
+  if (cesiumToken) {
+    Cesium.Ion.defaultAccessToken = cesiumToken;
+  }
+
+  // Create terrain provider based on config
+  let terrainProvider;
+  if (terrainConfig?.type === 'cesium-world') {
+    terrainProvider = Cesium.createWorldTerrain();
+  } else if (terrainConfig?.type === 'url' && terrainConfig?.url) {
+    terrainProvider = new Cesium.CesiumTerrainProvider({
+      url: terrainConfig.url
+    });
+  } else {
+    // Default: Cesium World Terrain
+    terrainProvider = Cesium.createWorldTerrain();
+  }
+
   const viewer = new Cesium.Viewer(containerId, {
-    terrainProvider: new Cesium.CesiumTerrainProvider({
-      url: '//3d.geo.admin.ch/ch.swisstopo.terrain.3d/v1'
-    }),
+    terrainProvider,
     baseLayerPicker: false,
     infoBox: false,
     animation: false,
     timeline: false,
     selectionIndicator: false,
+    navigationHelpButton: false,
+    sceneModePicker: false,
     creditContainer: document.getElementById(creditsContainerId)
   });
 
+  currentViewer = viewer;
   return viewer;
+}
+
+// Update terrain provider for region switch
+export function updateTerrain(viewer, terrainConfig) {
+  let terrainProvider;
+  if (terrainConfig?.type === 'cesium-world') {
+    terrainProvider = Cesium.createWorldTerrain();
+  } else if (terrainConfig?.type === 'url' && terrainConfig?.url) {
+    terrainProvider = new Cesium.CesiumTerrainProvider({
+      url: terrainConfig.url
+    });
+  } else {
+    terrainProvider = Cesium.createWorldTerrain();
+  }
+  viewer.terrainProvider = terrainProvider;
+}
+
+// Switch to global Cesium World Terrain (for areas outside regional terrain)
+export function useGlobalTerrain(viewer) {
+  viewer.terrainProvider = Cesium.createWorldTerrain();
+}
+
+export function flyToRegion(viewer, initialView) {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(
+      initialView.longitude,
+      initialView.latitude,
+      initialView.height
+    ),
+    orientation: {
+      heading: Cesium.Math.toRadians(initialView.heading || 0),
+      pitch: Cesium.Math.toRadians(initialView.pitch || -50),
+      roll: initialView.roll || 0
+    },
+    duration: 2
+  });
 }
 
 export function performInitialZoom(viewer) {
@@ -39,6 +97,14 @@ function makeProvider(layerDef, viewer, defaultImageryProvider) {
       url: layerDef.url,
       layers: layerDef.layers,
       parameters: layerDef.parameters ?? { format: 'image/png', transparent: true }
+    });
+  }
+
+  if (layerDef.type === 'xyz') {
+    return new Cesium.UrlTemplateImageryProvider({
+      url: layerDef.url,
+      minimumLevel: layerDef.minimumLevel ?? 0,
+      maximumLevel: layerDef.maximumLevel ?? 18
     });
   }
 
@@ -101,8 +167,10 @@ export function setExclusiveCategory(layerState, viewer, category, activeKey) {
 export function initLayers(viewer, layersConfig) {
   // Capture Cesium default imagery provider and remove it from layer stack,
   // so it can be managed like any other layer.
-  const defaultProvider = viewer.imageryLayers.get(0).imageryProvider;
-  viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+  const defaultProvider = viewer.imageryLayers.get(0)?.imageryProvider;
+  if (viewer.imageryLayers.get(0)) {
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+  }
 
   // Build runtime layer state
   const layerState = layersConfig.map(def => ({
@@ -120,10 +188,22 @@ export function initLayers(viewer, layersConfig) {
   for (const l of layerState) {
     if (l.active) ensureAdded(l, viewer);
   }
+  
+  // Pre-add global fallback layer (but keep hidden) for faster switching
+  const fallback = layerState.find(l => l.isGlobalFallback);
+  if (fallback && !fallback.viewerLayer) {
+    ensureAdded(fallback, viewer);
+    fallback.viewerLayer.show = false;
+  }
 
   // Enforce order and visibility
   for (const l of layerState) applyVisibility(l);
   applyLayerOrder(layerState, viewer);
 
   return layerState;
+}
+
+// Remove all imagery layers (used when switching regions)
+export function clearAllLayers(viewer) {
+  viewer.imageryLayers.removeAll();
 }
