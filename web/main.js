@@ -6,6 +6,89 @@ import { supabase } from './supabaseClient.js'
 import { gpx as togeojsonGpx, kml as togeojsonKml } from '@tmcw/togeojson'
 import './styles.css'
 
+// =========================
+// Custom Confirm/Alert Modal
+// =========================
+const confirmModal = document.getElementById('confirmModal');
+const confirmModalBackdrop = document.querySelector('.confirmModalBackdrop');
+const confirmModalIcon = document.getElementById('confirmModalIcon');
+const confirmModalTitle = document.getElementById('confirmModalTitle');
+const confirmModalMessage = document.getElementById('confirmModalMessage');
+const confirmModalCancel = document.getElementById('confirmModalCancel');
+const confirmModalConfirm = document.getElementById('confirmModalConfirm');
+
+let confirmResolve = null;
+
+function showConfirm({ 
+  title = 'Confirm', 
+  message = 'Are you sure?', 
+  icon = '⚠️',
+  variant = 'warning', // 'warning', 'danger', 'success', 'info'
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  confirmStyle = 'danger' // 'danger', 'primary'
+}) {
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    
+    confirmModal.className = `confirmModal ${variant}`;
+    confirmModalIcon.textContent = icon;
+    confirmModalTitle.textContent = title;
+    confirmModalMessage.textContent = message;
+    confirmModalConfirm.textContent = confirmText;
+    confirmModalCancel.textContent = cancelText;
+    
+    // Style confirm button
+    confirmModalConfirm.classList.remove('pillBtnDanger', 'pillBtnPrimary');
+    if (confirmStyle === 'danger') {
+      confirmModalConfirm.classList.add('pillBtnDanger');
+    }
+    
+    confirmModal.classList.remove('is-hidden', 'alert-mode');
+    confirmModalConfirm.focus();
+  });
+}
+
+function showAlert({ 
+  title = 'Notice', 
+  message = '', 
+  icon = 'ℹ️',
+  variant = 'info', // 'warning', 'danger', 'success', 'info'
+  buttonText = 'OK'
+}) {
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    
+    confirmModal.className = `confirmModal ${variant} alert-mode`;
+    confirmModalIcon.textContent = icon;
+    confirmModalTitle.textContent = title;
+    confirmModalMessage.textContent = message;
+    confirmModalConfirm.textContent = buttonText;
+    
+    confirmModalConfirm.classList.remove('pillBtnDanger');
+    
+    confirmModal.classList.remove('is-hidden');
+    confirmModalConfirm.focus();
+  });
+}
+
+function closeConfirmModal(result) {
+  confirmModal.classList.add('is-hidden');
+  if (confirmResolve) {
+    confirmResolve(result);
+    confirmResolve = null;
+  }
+}
+
+confirmModalConfirm.addEventListener('click', () => closeConfirmModal(true));
+confirmModalCancel.addEventListener('click', () => closeConfirmModal(false));
+confirmModalBackdrop.addEventListener('click', () => closeConfirmModal(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !confirmModal.classList.contains('is-hidden')) {
+    closeConfirmModal(false);
+  }
+});
+
 // helper: check if user is logged in and show/hide My Tours tab
 async function updateAuthState() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -87,6 +170,27 @@ function generateTourSlug() {
   }
 }
 
+// Create Tour button / form toggle
+const createTourBtn = document.getElementById('createTourBtn');
+const cancelTourBtn = document.getElementById('cancelTourBtn');
+const newTourTitleInput = document.getElementById('newTourTitle');
+
+function showCreateTourForm() {
+  createTourBtn.classList.add('is-hidden');
+  newTourForm.classList.remove('is-hidden');
+  newTourTitleInput.value = '';
+  newTourTitleInput.focus();
+}
+
+function hideCreateTourForm() {
+  newTourForm.classList.add('is-hidden');
+  createTourBtn.classList.remove('is-hidden');
+  newTourTitleInput.value = '';
+}
+
+createTourBtn.addEventListener('click', showCreateTourForm);
+cancelTourBtn.addEventListener('click', hideCreateTourForm);
+
 navLegend.addEventListener('click', showLegend);
 navMyTours.addEventListener('click', showMyTours);
 
@@ -98,7 +202,7 @@ async function currentUser() {
 async function loadMyTours() {
   toursList.innerHTML = 'Loading...';
   const user = await currentUser();
-  if (!user) { toursList.innerHTML = 'Please login to see your tours.'; return }
+  if (!user) { toursList.innerHTML = 'Please log in to see your tours.'; return }
 
   // owned tours
   const { data: owned, error: e1 } = await supabase
@@ -120,8 +224,19 @@ async function loadMyTours() {
     memberTours = data || [];
   }
 
-  const all = [...(owned||[]), ...memberTours];
+  // Mark owned vs member tours
+  const ownedWithFlag = (owned || []).map(t => ({ ...t, isOwner: true }));
+  const memberWithFlag = memberTours.map(t => ({ ...t, isOwner: false }));
+  
+  const all = [...ownedWithFlag, ...memberWithFlag];
   if (!all.length) { toursList.innerHTML = '<div>No tours yet.</div>'; return }
+
+  // Get member counts for all tours
+  const tourMemberCounts = {};
+  for (const t of all) {
+    const { data: count } = await supabase.rpc('get_tour_member_count', { p_tour_id: t.id });
+    tourMemberCounts[t.id] = count || 0;
+  }
 
   toursList.innerHTML = '';
   for (const t of all) {
@@ -132,17 +247,52 @@ async function loadMyTours() {
     const isNew = Date.now() - new Date(t.created_at).getTime() < 10000;
     const isHidden = !isNew; // old tours start hidden
     
+    const memberCount = tourMemberCounts[t.id] || 0;
+    const isShared = memberCount > 0;
+    
+    // For members (not owner), they always see the shared icon since the tour is shared with them
+    const showSharedIcon = t.isOwner ? isShared : true;
+    
+    // Different menu options for owner vs member
+    const menuItems = t.isOwner
+      ? `<li class="tourMenuRename" data-tour="${t.id}">Rename</li>
+         <li class="tourMenuShare" data-tour="${t.id}" data-title="${t.title}">Share</li>
+         <li class="tourMenuDelete" data-tour="${t.id}" data-is-owner="true">Delete</li>`
+      : `<li class="tourMenuLeave" data-tour="${t.id}">Leave tour</li>`;
+    
+    // Share icon - shown for owners if shared, always for members
+    // Different tooltip text for owner vs member
+    const shareIconTitle = t.isOwner 
+      ? `Shared with ${memberCount} person${memberCount > 1 ? 's' : ''}`
+      : `Shared with you`;
+    
+    const shareIcon = showSharedIcon 
+      ? `<button class="iconBtn tourSharedBtn" data-tour="${t.id}" title="${shareIconTitle}">
+           <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+           </svg>
+         </button>`
+      : '';
+
     el.innerHTML = `
       <div class="tourHeader" data-tour="${t.id}">
-        <strong>${t.title}</strong>
-        <div class="tourMenuWrap">
-          <button class="iconBtn tourMenuBtn" data-tour="${t.id}" title="More options" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-          </button>
-          <ul class="tourMenu is-hidden" data-tour="${t.id}">
-            <li class="tourMenuDelete" data-tour="${t.id}">Delete</li>
-          </ul>
+        <strong class="tourTitle" data-tour="${t.id}" data-editable="false">${t.title}</strong>
+        <div class="tourHeaderActions">
+          ${shareIcon}
+          <div class="tourMenuWrap">
+            <button class="iconBtn tourMenuBtn" data-tour="${t.id}" title="More options" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+            <ul class="tourMenu is-hidden" data-tour="${t.id}">
+              ${menuItems}
+            </ul>
+          </div>
         </div>
+      </div>
+      <!-- Shared members popup -->
+      <div class="tourMembersPopup is-hidden" data-tour="${t.id}">
+        <div class="tourMembersPopupHeader">Shared with:</div>
+        <div class="tourMembersPopupList" data-tour="${t.id}">Loading...</div>
       </div>
       <div class="tourContent ${isHidden ? 'is-hidden' : ''}" id="content-${t.id}">
         <div class="tracksList" id="tracks-${t.id}">Loading tracks...</div>
@@ -153,13 +303,54 @@ async function loadMyTours() {
           </label>
           <span class="uploadStatus" data-tour="${t.id}"></span>
         </div>
-        <div class="tourFooter">
-          <input type="text" placeholder="Share Tour by mail" class="shareEmail" data-tour="${t.id}" />
-          <button class="shareBtn" data-tour="${t.id}">Share</button>
-        </div>
       </div>
     `;
     toursList.appendChild(el);
+
+    // Shared button click - show members popup
+    const sharedBtn = el.querySelector('.tourSharedBtn');
+    const membersPopup = el.querySelector('.tourMembersPopup');
+    if (sharedBtn && membersPopup) {
+      sharedBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        // Toggle popup
+        const wasHidden = membersPopup.classList.contains('is-hidden');
+        
+        // Close all other popups first
+        document.querySelectorAll('.tourMembersPopup').forEach(p => p.classList.add('is-hidden'));
+        
+        if (wasHidden) {
+          membersPopup.classList.remove('is-hidden');
+          
+          // Load members
+          const membersList = membersPopup.querySelector('.tourMembersPopupList');
+          membersList.innerHTML = 'Loading...';
+          
+          const { data: members, error } = await supabase.rpc('get_tour_members', { p_tour_id: t.id });
+          
+          if (error) {
+            membersList.innerHTML = 'Error loading members';
+          } else if (!members || members.length === 0) {
+            membersList.innerHTML = 'No members';
+          } else {
+            membersList.innerHTML = members.map(m => `
+              <div class="tourMemberItem">
+                <span class="tourMemberEmail">${m.email}</span>
+                <span class="tourMemberRole">${m.role === 'editor' ? 'Editor' : 'Viewer'}</span>
+              </div>
+            `).join('');
+          }
+        }
+      });
+      
+      // Close popup when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!membersPopup.contains(e.target) && !sharedBtn.contains(e.target)) {
+          membersPopup.classList.add('is-hidden');
+        }
+      });
+    }
 
     // header click toggles collapse/expand
     const header = el.querySelector('.tourHeader');
@@ -168,10 +359,15 @@ async function loadMyTours() {
     header.addEventListener('click', (ev) => {
       if (ev.target.classList.contains('tourDeleteBtn') || ev.target.classList.contains('tourColorPicker')) return;
       const willHide = !content.classList.contains('is-hidden');
-      content.classList.toggle('is-hidden');
+      
       if (willHide) {
+        // Closing this tour
+        content.classList.add('is-hidden');
         hideTracksForTour(t.id);
       } else {
+        // Opening this tour - close all other tours first
+        closeAllToursExcept(t.id);
+        content.classList.remove('is-hidden');
         autoShowAllTracks(t.id);
       }
     });
@@ -219,38 +415,157 @@ async function loadMyTours() {
         closeAllContextMenus();
       }
     });
-    // Löschen im Menü
-    tourMenu.querySelector('.tourMenuDelete').addEventListener('click', async () => {
-      tourMenu.classList.add('is-hidden');
-      tourMenuBtn.setAttribute('aria-expanded', 'false');
-      if (!confirm(`Delete tour "${t.title}"? This cannot be undone.`)) return;
-      const { error } = await supabase.from('tours').delete().eq('id', t.id);
-      if (error) {
-        statusSpan.textContent = '✗ Delete failed: ' + error.message;
-        statusSpan.style.color = 'red';
-        return;
-      }
-      loadMyTours();
-    });
+    
+    // Rename im Menü (nur für Owner)
+    const renameMenuItem = tourMenu.querySelector('.tourMenuRename');
+    const tourTitleEl = el.querySelector('.tourTitle');
+    if (renameMenuItem && tourTitleEl) {
+      renameMenuItem.addEventListener('click', async () => {
+        tourMenu.classList.add('is-hidden');
+        tourMenuBtn.setAttribute('aria-expanded', 'false');
+        
+        // Enter edit mode
+        tourTitleEl.contentEditable = 'true';
+        tourTitleEl.setAttribute('data-editable', 'true');
+        tourTitleEl.focus();
+        
+        // Select all text
+        const range = document.createRange();
+        range.selectNodeContents(tourTitleEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        
+        const saveRename = async () => {
+          tourTitleEl.contentEditable = 'false';
+          tourTitleEl.setAttribute('data-editable', 'false');
+          const newName = tourTitleEl.textContent.trim();
+          if (newName && newName !== t.title) {
+            const { error } = await supabase.from('tours').update({ title: newName }).eq('id', t.id);
+            if (error) {
+              await showAlert({ title: 'Rename Failed', message: error.message, icon: '❌', variant: 'danger' });
+              tourTitleEl.textContent = t.title; // Revert
+              return;
+            }
+            t.title = newName;
+            // Update share menu item data attribute
+            const shareItem = tourMenu.querySelector('.tourMenuShare');
+            if (shareItem) shareItem.dataset.title = newName;
+          } else if (!newName) {
+            tourTitleEl.textContent = t.title; // Revert if empty
+          }
+        };
+        
+        tourTitleEl.addEventListener('blur', saveRename, { once: true });
+        tourTitleEl.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            tourTitleEl.blur();
+          } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            tourTitleEl.textContent = t.title;
+            tourTitleEl.blur();
+          }
+        }, { once: true });
+      });
+    }
+    
+    // Löschen im Menü (nur für Owner)
+    const deleteMenuItem = tourMenu.querySelector('.tourMenuDelete');
+    if (deleteMenuItem) {
+      deleteMenuItem.addEventListener('click', async () => {
+        tourMenu.classList.add('is-hidden');
+        tourMenuBtn.setAttribute('aria-expanded', 'false');
+        
+        // Get member count to warn owner
+        const { data: memberCount } = await supabase.rpc('get_tour_member_count', { p_tour_id: t.id });
+        
+        let confirmMsg = `Really delete tour "${t.title}"? This cannot be undone.`;
+        let confirmIcon = '🗑️';
+        if (memberCount && memberCount > 0) {
+          confirmMsg = `Really delete tour "${t.title}"?\n\nThis tour is shared with ${memberCount} person${memberCount > 1 ? 's' : ''}. Deleting it will remove access for all members.\n\nThis cannot be undone.`;
+          confirmIcon = '⚠️';
+        }
+        
+        const confirmed = await showConfirm({
+          title: 'Delete Tour',
+          message: confirmMsg,
+          icon: confirmIcon,
+          variant: 'danger',
+          confirmText: 'Delete',
+          confirmStyle: 'danger'
+        });
+        if (!confirmed) return;
+        const { error } = await supabase.from('tours').delete().eq('id', t.id);
+        if (error) {
+          statusSpan.textContent = '✗ Delete failed: ' + error.message;
+          statusSpan.style.color = 'red';
+          return;
+        }
+        loadMyTours();
+      });
+    }
 
-    const shareBtn = el.querySelector('.shareBtn');
-    shareBtn.addEventListener('click', async (ev) => {
-      const email = el.querySelector('.shareEmail').value.trim();
-      if (!email) { statusSpan.textContent = '✗ Provide email'; statusSpan.style.color = 'red'; return }
-      const { error } = await supabase.rpc('share_tour_with_email', { p_tour_id: t.id, p_email: email });
-      if (error) {
-        statusSpan.textContent = '✗ Share failed: ' + error.message;
-        statusSpan.style.color = 'red';
-      } else {
-        statusSpan.textContent = '✓ Shared';
-        statusSpan.style.color = 'green';
-        el.querySelector('.shareEmail').value = '';
-        setTimeout(() => { statusSpan.textContent = ''; }, 2000);
+    // Tour verlassen im Menü (nur für Members)
+    const leaveMenuItem = tourMenu.querySelector('.tourMenuLeave');
+    if (leaveMenuItem) {
+      leaveMenuItem.addEventListener('click', async () => {
+        tourMenu.classList.add('is-hidden');
+        tourMenuBtn.setAttribute('aria-expanded', 'false');
+        
+        const confirmed = await showConfirm({
+          title: 'Leave Tour',
+          message: `Leave tour "${t.title}"?\n\nYou can only see it again if the owner shares it with you again.`,
+          icon: '🚪',
+          variant: 'warning',
+          confirmText: 'Leave',
+          confirmStyle: 'danger'
+        });
+        if (!confirmed) return;
+        
+        try {
+          const { error } = await supabase.rpc('leave_tour', { p_tour_id: t.id });
+          if (error) {
+            console.error('Leave tour error:', error);
+            await showAlert({
+              title: 'Leave Failed',
+              message: error.message,
+              icon: '❌',
+              variant: 'danger'
+            });
+            return;
+          }
+          loadMyTours();
+        } catch (e) {
+          console.error('Leave tour exception:', e);
+          await showAlert({
+            title: 'Leave Failed',
+            message: e.message || 'Unknown error',
+            icon: '❌',
+            variant: 'danger'
+          });
+        }
+      });
+    }
+
+    // Teilen im Menü - öffnet Modal (nur für Owner)
+    const shareMenuItem = tourMenu.querySelector('.tourMenuShare');
+    if (shareMenuItem) {
+      shareMenuItem.addEventListener('click', () => {
+        tourMenu.classList.add('is-hidden');
+        tourMenuBtn.setAttribute('aria-expanded', 'false');
+        openShareModal(t.id, t.title);
+      });
+    }
+
+    // load tracks for this tour, then auto-show if tour is open
+    loadTracksForTour(t.id).then(() => {
+      // If this tour is open (new tour), close others and show its tracks
+      if (!content.classList.contains('is-hidden')) {
+        closeAllToursExcept(t.id);
+        autoShowAllTracks(t.id);
       }
     });
-
-    // load tracks for this tour
-    loadTracksForTour(t.id);
   }
 }
 
@@ -285,9 +600,10 @@ async function loadTracksForTour(tourId) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
             </button>
             <ul class="trackMenu is-hidden" data-track="${tr.id}">
-              <li class="trackMenuEdit" data-track="${tr.id}">Editieren</li>
-              <li class="trackMenuCenter" data-track="${tr.id}">Zentrieren</li>
-              <li class="trackMenuDelete" data-track="${tr.id}">Löschen</li>
+              <li class="trackMenuDownload" data-track="${tr.id}" data-original="${tr.original_file_path || ''}">Download GPX</li>
+              <li class="trackMenuEdit" data-track="${tr.id}">Edit</li>
+              <li class="trackMenuCenter" data-track="${tr.id}">Center</li>
+              <li class="trackMenuDelete" data-track="${tr.id}">Delete</li>
             </ul>
           </div>
         </div>
@@ -342,8 +658,8 @@ async function loadTracksForTour(tourId) {
             ent.properties.trackId = tr.id;
           }
         });
-        // Zoom to track
-        zoomToTrack(ds);
+        // Zoom to track with smart positioning
+        zoomToTrack(ds, tr.id);
       } else {
         // remove dataSource by name
         const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
@@ -371,6 +687,53 @@ async function loadTracksForTour(tourId) {
         closeAllContextMenus();
       }
     });
+    // Download GPX
+    menu.querySelector('.trackMenuDownload').addEventListener('click', async () => {
+      menu.classList.add('is-hidden');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      
+      const originalPath = menu.querySelector('.trackMenuDownload').dataset.original;
+      const trackName = tr.name || 'track';
+      const fileName = `${trackName.replace(/[^a-zA-Z0-9_-]/g, '_')}.gpx`;
+      
+      try {
+        let gpxContent;
+        
+        if (originalPath) {
+          // Download original file from storage
+          const { data, error } = await supabase.storage
+            .from('tracks')
+            .download(originalPath);
+          
+          if (error) throw error;
+          gpxContent = await data.text();
+        } else {
+          // Generate GPX from stored geometry via RPC
+          const { data, error } = await supabase.rpc('get_track_as_gpx', { p_track_id: tr.id });
+          if (error) throw error;
+          gpxContent = data;
+        }
+        
+        // Trigger download
+        const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('Download failed:', e);
+        await showAlert({
+          title: 'Download Failed',
+          message: e.message || 'Unknown error',
+          icon: '❌',
+          variant: 'danger'
+        });
+      }
+    });
     // Editieren
     menu.querySelector('.trackMenuEdit').addEventListener('click', async () => {
       menu.classList.add('is-hidden');
@@ -381,7 +744,10 @@ async function loadTracksForTour(tourId) {
         const newName = nameSpan.textContent.trim();
         if (newName) {
           const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
-          if (error) return alert('Save failed: ' + error.message);
+          if (error) {
+            await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
+            return;
+          }
           tr.name = newName;
         }
         nameSpan.contentEditable = 'false';
@@ -398,7 +764,10 @@ async function loadTracksForTour(tourId) {
           const newName = nameSpan.textContent.trim();
           if (newName && newName !== tr.name) {
             const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
-            if (error) return alert('Save failed: ' + error.message);
+            if (error) {
+              await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
+              return;
+            }
             tr.name = newName;
           }
         };
@@ -415,17 +784,42 @@ async function loadTracksForTour(tourId) {
     menu.querySelector('.trackMenuCenter').addEventListener('click', () => {
       menu.classList.add('is-hidden');
       menuBtn.setAttribute('aria-expanded', 'false');
-      // Center on track (zoom)
+      // Center on track (smart zoom)
       const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
-      if (ds) zoomToTrack(ds);
+      if (ds) zoomToTrack(ds, tr.id);
     });
     // Löschen
     menu.querySelector('.trackMenuDelete').addEventListener('click', async () => {
       menu.classList.add('is-hidden');
       menuBtn.setAttribute('aria-expanded', 'false');
-      if (!confirm('Delete this track?')) return;
+      
+      const confirmed = await showConfirm({
+        title: 'Delete Track',
+        message: `Delete track "${tr.name || 'Unnamed'}"?\n\nThis cannot be undone.`,
+        icon: '🗑️',
+        variant: 'danger',
+        confirmText: 'Delete',
+        confirmStyle: 'danger'
+      });
+      if (!confirmed) return;
+      
+      // Delete original file from storage if it exists
+      const originalPath = tr.original_file_path;
+      if (originalPath) {
+        const { error: storageError } = await supabase.storage
+          .from('tracks')
+          .remove([originalPath]);
+        if (storageError) {
+          console.warn('Could not delete original file from storage:', storageError);
+          // Continue with DB deletion anyway
+        }
+      }
+      
       const { error } = await supabase.from('tour_tracks').delete().eq('id', tr.id);
-      if (error) return alert('Delete failed: ' + error.message);
+      if (error) {
+        await showAlert({ title: 'Delete Failed', message: error.message, icon: '❌', variant: 'danger' });
+        return;
+      }
       // remove from map
       const ds = viewer.dataSources.getByName(`track-${tr.id}`)[0];
       if (ds) viewer.dataSources.remove(ds, true);
@@ -445,7 +839,10 @@ async function toggleShowAllTracksForTour(tourId) {
   });
   // Always fetch tracks and then decide: if none of these tracks are shown, show them; otherwise remove them
   const { data, error } = await supabase.rpc('get_tracks_for_user');
-  if (error) return alert('Could not load tracks: ' + error.message);
+  if (error) {
+    await showAlert({ title: 'Load Failed', message: 'Could not load tracks: ' + error.message, icon: '❌', variant: 'danger' });
+    return;
+  }
   const tracks = (data || []).filter(r => r.tour_id === tourId);
   if (!tracks.length) return;
   // check if at least one track for this tour is loaded
@@ -472,6 +869,32 @@ async function toggleShowAllTracksForTour(tourId) {
       if (cb) cb.checked = true;
     }
   }
+}
+
+// Close all tours except the specified one and hide their tracks
+function closeAllToursExcept(exceptTourId) {
+  const allTourContents = document.querySelectorAll('.tourContent');
+  allTourContents.forEach(content => {
+    const tourId = content.id.replace('content-', '');
+    if (tourId !== exceptTourId && !content.classList.contains('is-hidden')) {
+      content.classList.add('is-hidden');
+      hideTracksForTour(tourId);
+    }
+  });
+}
+
+// Hide all tracks from the map (used when switching tours)
+function hideAllTracks() {
+  const allDataSources = [...(viewer.dataSources._dataSources || [])];
+  for (const ds of allDataSources) {
+    if (ds.name && ds.name.startsWith('track-')) {
+      viewer.dataSources.remove(ds, true);
+    }
+  }
+  // Uncheck all track checkboxes
+  document.querySelectorAll('.trackToggle').forEach(cb => {
+    cb.checked = false;
+  });
 }
 
 function pickColorForTour(tourId) {
@@ -564,7 +987,74 @@ async function autoShowAllTracks(tourId) {
   }
 }
 
-function zoomToTrack(dataSource) {
+// Intelligent zoom to track using PostGIS-computed statistics
+async function zoomToTrackSmart(trackId) {
+  try {
+    const { data: stats, error } = await supabase.rpc('get_track_view_stats', { p_track_id: trackId });
+    if (error || !stats) {
+      console.warn('Could not get track stats, using fallback zoom');
+      return false;
+    }
+
+    const bbox = stats.bbox;
+    const azimuth = stats.azimuth_deg || 0;
+    const lengthM = stats.length_m || 1000;
+    
+    // Calculate center point of track
+    const centerLon = stats.center_lon;
+    const centerLat = stats.center_lat;
+    const centerEle = ((bbox.min_ele || 0) + (bbox.max_ele || 0)) / 2;
+    
+    // Create center position
+    const centerPosition = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, centerEle);
+    
+    // Calculate camera distance (range) based on track length
+    // Longer tracks need more distance to see the whole track
+    const range = Math.max(lengthM * 0.8, 500);
+    
+    // Camera heading: Look ALONG the track direction
+    // Cesium heading: 0 = North, positive = clockwise
+    // PostGIS azimuth: 0 = North, positive = clockwise (same!)
+    // We want to look FROM the side, so perpendicular to track (+90°)
+    const heading = Cesium.Math.toRadians((azimuth + 90) % 360);
+    
+    // Camera pitch: Looking down at the track from above
+    // -90° = straight down, 0 = horizontal
+    // Use around -45° to -60° for a good 3D view
+    const pitch = Cesium.Math.toRadians(-50);
+    
+    // Create bounding sphere around track center
+    const boundingSphere = new Cesium.BoundingSphere(centerPosition, range * 0.5);
+    
+    // Fly to bounding sphere with heading/pitch/range offset
+    viewer.camera.flyToBoundingSphere(boundingSphere, {
+      duration: 1.8,
+      offset: new Cesium.HeadingPitchRange(heading, pitch, range)
+    });
+    
+    return true;
+  } catch (e) {
+    console.warn('Smart zoom failed:', e);
+    return false;
+  }
+}
+
+function zoomToTrack(dataSource, trackId) {
+  // Try smart zoom first if we have a trackId
+  if (trackId) {
+    zoomToTrackSmart(trackId).then(success => {
+      if (!success) {
+        zoomToTrackFallback(dataSource);
+      }
+    });
+    return;
+  }
+  
+  // Fallback to bounding box zoom
+  zoomToTrackFallback(dataSource);
+}
+
+function zoomToTrackFallback(dataSource) {
   // Calculate bounding sphere for all polylines in datasource
   if (!dataSource || !dataSource.entities) return;
   
@@ -638,13 +1128,23 @@ function zoomToTrack(dataSource) {
 // New tour form
 newTourForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const title = document.getElementById('newTourTitle').value.trim();
-  if (!title) return alert('Provide tour name');
-  const user = await currentUser(); if (!user) return alert('Login required');
+  const title = newTourTitleInput.value.trim();
+  if (!title) {
+    await showAlert({ title: 'Missing Name', message: 'Please provide a tour name.', icon: '✏️', variant: 'warning' });
+    return;
+  }
+  const user = await currentUser();
+  if (!user) {
+    await showAlert({ title: 'Login Required', message: 'Please log in to create tours.', icon: '🔒', variant: 'warning' });
+    return;
+  }
   const slug = generateTourSlug();
   const { data, error } = await supabase.from('tours').insert([{ title, slug, owner_id: user.id }]).select();
-  if (error) return alert(error.message);
-  document.getElementById('newTourTitle').value = '';
+  if (error) {
+    await showAlert({ title: 'Create Failed', message: error.message, icon: '❌', variant: 'danger' });
+    return;
+  }
+  hideCreateTourForm();
   loadMyTours();
 });
 
@@ -722,7 +1222,36 @@ async function handleFileUpload(file, tourId) {
   
   // track name defaults to file name without extension
   const trackName = file.name.replace(/\.[^/.]+$/, "");
-  const { data, error } = await supabase.rpc('insert_tour_track', { p_tour_id: tourId, p_props: {}, p_geojson: geojson, p_track_name: trackName });
+  
+  // Upload original file to storage (if it's GPX or KML, preserve it)
+  let originalFilePath = null;
+  const fileExt = file.name.split('.').pop().toLowerCase();
+  if (['gpx', 'kml'].includes(fileExt)) {
+    const user = await currentUser();
+    const storagePath = `${user.id}/${tourId}/${Date.now()}_${file.name}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('tracks')
+      .upload(storagePath, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false
+      });
+    
+    if (!uploadError) {
+      originalFilePath = storagePath;
+    } else {
+      console.warn('Could not store original file:', uploadError.message);
+      // Continue without original - GPX can be generated from geometry
+    }
+  }
+  
+  const { data, error } = await supabase.rpc('insert_tour_track', { 
+    p_tour_id: tourId, 
+    p_props: {}, 
+    p_geojson: geojson, 
+    p_track_name: trackName,
+    p_original_file_path: originalFilePath
+  });
   if (error) throw new Error('Upload failed: ' + error.message);
   
   const insertedId = (Array.isArray(data) && data[0]) ? data[0] : data;
@@ -756,16 +1285,18 @@ async function handleFileUpload(file, tourId) {
       ent.properties = ent.properties || {};
       ent.properties.highlighted = false;
       ent.properties.tourId = tourId;
+      ent.properties.trackId = trackData.id;
     } 
   });
   
-  // Zoom to track
-  zoomToTrack(ds);
+  // Zoom to track with smart positioning
+  zoomToTrack(ds, trackData.id);
   
-  // refresh tracks list to show new track
-  loadTracksForTour(tourId);
+  // refresh tracks list to show new track, then check the new track's checkbox
+  await loadTracksForTour(tourId);
+  const newCb = document.querySelector(`.trackToggle[data-track="${trackData.id}"]`);
+  if (newCb) newCb.checked = true;
 }
-
 // Initialize authentication UI
 initAuthUI()
 
@@ -786,3 +1317,175 @@ viewer.homeButton.viewModel.command.beforeExecute.addEventListener((event) => {
   performInitialZoom(viewer);
 });
 
+// =========================
+// Share Modal Logic
+// =========================
+const shareModal = document.getElementById('shareModal');
+const shareModalEmails = document.getElementById('shareModalEmails');
+const shareModalResults = document.getElementById('shareModalResults');
+const shareModalSubmit = document.getElementById('shareModalSubmit');
+const shareModalCancel = document.getElementById('shareModalCancel');
+const shareModalClose = document.querySelector('.shareModalClose');
+const shareModalBackdrop = document.querySelector('.shareModalBackdrop');
+
+let currentShareTourId = null;
+let currentShareTourTitle = '';
+
+function openShareModal(tourId, tourTitle) {
+  currentShareTourId = tourId;
+  currentShareTourTitle = tourTitle;
+  shareModalEmails.value = '';
+  shareModalResults.innerHTML = '';
+  shareModal.classList.remove('is-hidden');
+  shareModalEmails.focus();
+}
+
+function closeShareModal() {
+  shareModal.classList.add('is-hidden');
+  currentShareTourId = null;
+  currentShareTourTitle = '';
+}
+
+// Parse emails from textarea (comma, semicolon, newline separated)
+function parseEmails(text) {
+  return text
+    .split(/[\n,;]+/)
+    .map(e => e.trim().toLowerCase())
+    .filter(e => e.length > 0 && e.includes('@'));
+}
+
+// Send invitation email (mailto fallback)
+function sendInvitationEmail(email, tourTitle) {
+  const subject = encodeURIComponent(`Invitation: Tour "${tourTitle}" in 3D Viewer`);
+  const body = encodeURIComponent(
+    `Hello!\n\n` +
+    `I would like to share the tour "${tourTitle}" with you.\n\n` +
+    `Please register in the 3D Viewer and let me know so I can share the tour with your account.\n\n` +
+    `Best regards`
+  );
+  window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+}
+
+// Share with multiple emails
+async function shareWithEmails() {
+  const emails = parseEmails(shareModalEmails.value);
+  
+  if (emails.length === 0) {
+    shareModalResults.innerHTML = `
+      <div class="shareModalResult error">
+        <span class="shareModalResultIcon">⚠️</span>
+        <span class="shareModalResultText">Please enter at least one valid email address.</span>
+      </div>
+    `;
+    return;
+  }
+
+  shareModalResults.innerHTML = '<div style="color: rgba(var(--color-text-rgb), 0.6); font-size: 13px;">Sharing tour...</div>';
+  shareModalSubmit.disabled = true;
+
+  const results = [];
+
+  for (const email of emails) {
+    const { error } = await supabase.rpc('share_tour_with_email', { 
+      p_tour_id: currentShareTourId, 
+      p_email: email 
+    });
+
+    if (error) {
+      // Check if user not found
+      const isUserNotFound = error.message.includes('not found') || error.message.includes('nicht gefunden');
+      results.push({
+        email,
+        success: false,
+        userNotFound: isUserNotFound,
+        message: isUserNotFound 
+          ? 'User not registered' 
+          : error.message
+      });
+    } else {
+      results.push({
+        email,
+        success: true,
+        message: 'Shared successfully'
+      });
+    }
+  }
+
+  // Render results
+  shareModalResults.innerHTML = results.map(r => {
+    if (r.success) {
+      return `
+        <div class="shareModalResult success">
+          <span class="shareModalResultIcon">✓</span>
+          <span class="shareModalResultText"><strong>${r.email}</strong> – ${r.message}</span>
+        </div>
+      `;
+    } else if (r.userNotFound) {
+      return `
+        <div class="shareModalResult invite">
+          <span class="shareModalResultIcon">📧</span>
+          <span class="shareModalResultText"><strong>${r.email}</strong> – ${r.message}</span>
+          <button class="shareModalInviteBtn" data-email="${r.email}">Invite</button>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="shareModalResult error">
+          <span class="shareModalResultIcon">✗</span>
+          <span class="shareModalResultText"><strong>${r.email}</strong> – ${r.message}</span>
+        </div>
+      `;
+    }
+  }).join('');
+
+  // Add event listeners for invite buttons
+  shareModalResults.querySelectorAll('.shareModalInviteBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const email = e.target.dataset.email;
+      sendInvitationEmail(email, currentShareTourTitle);
+      e.target.textContent = 'Mail opened';
+      e.target.disabled = true;
+    });
+  });
+
+  shareModalSubmit.disabled = false;
+
+  // If at least one share was successful, close modal and refresh tours list
+  const anySuccess = results.some(r => r.success);
+  const allSuccess = results.every(r => r.success);
+  
+  if (allSuccess) {
+    // All successful - close immediately and refresh
+    shareModalEmails.value = '';
+    closeShareModal();
+    loadMyTours(); // Refresh to show shared icon
+  } else if (anySuccess) {
+    // Some successful - clear successful ones, keep modal open for failed ones
+    shareModalEmails.value = results
+      .filter(r => !r.success)
+      .map(r => r.email)
+      .join('\n');
+    loadMyTours(); // Refresh to show shared icon
+  }
+}
+
+// Event listeners for modal
+shareModalSubmit.addEventListener('click', shareWithEmails);
+shareModalCancel.addEventListener('click', closeShareModal);
+shareModalClose.addEventListener('click', closeShareModal);
+shareModalBackdrop.addEventListener('click', closeShareModal);
+
+// Close on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !shareModal.classList.contains('is-hidden')) {
+    closeShareModal();
+  }
+});
+
+// Allow submitting with Enter (Ctrl+Enter for multiline)
+shareModalEmails.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) {
+    e.preventDefault();
+    shareWithEmails();
+  }
+});

@@ -11,10 +11,10 @@ import {
 const sanitize = (s) => s.replace(/[^a-zA-Z0-9-_]/g, '-');
 
 // Categories treated as radio groups (only one active)
-const radioGroups = ['Basiskarten'];
+const radioGroups = ['Base Maps'];
 
 // Category display order in the legend
-const categoryOrder = ['Analyse', 'Gefahrenkarten', 'Basiskarten'];
+const categoryOrder = ['Analysis', 'Hazard Maps', 'Base Maps'];
 
 export function addLayersToLegend(layerState, viewer) {
   const grouped = layerState.reduce((acc, layer) => {
@@ -85,7 +85,7 @@ function createLayerItem(layer, isRadio, layerState, viewer) {
   menu.className = 'legend-item-menu';
 
   const label = document.createElement('label');
-  label.textContent = 'Transparenz';
+  label.textContent = 'Opacity';
 
   const range = document.createElement('input');
   range.type = 'range';
@@ -121,7 +121,7 @@ function createCollapsibleBox(layers, isRadio, layerState, viewer) {
   const button = document.createElement('button');
   button.className = 'legend-collapsible-btn';
   button.type = 'button';
-  button.textContent = `+ Weitere ${layers.length} Element${layers.length !== 1 ? 'e' : ''} anzeigen`;
+  button.textContent = `+ Show ${layers.length} more item${layers.length !== 1 ? 's' : ''}`;
 
   const hiddenLayers = document.createElement('div');
   hiddenLayers.className = 'legend-collapsible-items is-hidden';
@@ -134,8 +134,8 @@ function createCollapsibleBox(layers, isRadio, layerState, viewer) {
   button.addEventListener('click', () => {
     const isHidden = hiddenLayers.classList.toggle('is-hidden');
     button.textContent = isHidden 
-      ? `+ Weitere ${layers.length} Element${layers.length !== 1 ? 'e' : ''} anzeigen`
-      : `− Weitere ${layers.length} Element${layers.length !== 1 ? 'e' : ''} ausblenden`;
+      ? `+ Show ${layers.length} more item${layers.length !== 1 ? 's' : ''}`
+      : `− Hide ${layers.length} item${layers.length !== 1 ? 's' : ''}`;
     button.classList.toggle('open', !isHidden);
   });
 

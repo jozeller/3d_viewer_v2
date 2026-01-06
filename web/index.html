@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de-CH">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -55,6 +55,8 @@
           <p><strong>Analysis Layers:</strong> Multiple layers can be displayed simultaneously</p>
           <p><strong>Hazard Maps:</strong> Overlay additional information</p>
           <p><strong>Transparency:</strong> Adjust the opacity of layers</p>
+          <hr class="infoDivider" />
+          <p><strong>My Tours:</strong> Log in to create tours, upload GPX tracks, and share them with others</p>
         </div>
       </div>
 
@@ -69,9 +71,11 @@
 
       <div id="viewMyTours" class="is-hidden">
         <div class="myToursHeader">
-          <form id="newTourForm">
+          <button id="createTourBtn" class="pillBtn" type="button">+ Create Tour</button>
+          <form id="newTourForm" class="is-hidden">
             <input id="newTourTitle" placeholder="Tour name" required />
-            <button type="submit" class="pillBtn">Create Tour</button>
+            <button type="submit" class="pillBtn">Create</button>
+            <button type="button" id="cancelTourBtn" class="pillBtn pillBtnGhost">Cancel</button>
           </form>
         </div>
 
@@ -188,6 +192,40 @@
   >
     ☰
   </button>
+
+  <!-- Share Modal Overlay -->
+  <div id="shareModal" class="shareModal is-hidden" aria-modal="true" role="dialog">
+    <div class="shareModalBackdrop"></div>
+    <div class="shareModalContent">
+      <div class="shareModalHeader">
+        <h2 class="shareModalTitle">Share Tour</h2>
+        <button class="shareModalClose" type="button" aria-label="Close">✖</button>
+      </div>
+      <div class="shareModalBody">
+        <p class="shareModalHint">Enter one or more email addresses (one per line or separated by commas):</p>
+        <textarea id="shareModalEmails" class="shareModalTextarea" placeholder="email@example.com&#10;another@example.com" rows="4"></textarea>
+        <div id="shareModalResults" class="shareModalResults"></div>
+      </div>
+      <div class="shareModalFooter">
+        <button id="shareModalCancel" class="pillBtn pillBtnGhost" type="button">Cancel</button>
+        <button id="shareModalSubmit" class="pillBtn" type="button">Share</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm/Alert Modal Overlay -->
+  <div id="confirmModal" class="confirmModal is-hidden" aria-modal="true" role="alertdialog">
+    <div class="confirmModalBackdrop"></div>
+    <div class="confirmModalContent">
+      <div class="confirmModalIcon" id="confirmModalIcon">⚠️</div>
+      <h2 class="confirmModalTitle" id="confirmModalTitle">Confirm</h2>
+      <p class="confirmModalMessage" id="confirmModalMessage">Are you sure?</p>
+      <div class="confirmModalFooter">
+        <button id="confirmModalCancel" class="pillBtn pillBtnGhost" type="button">Cancel</button>
+        <button id="confirmModalConfirm" class="pillBtn pillBtnDanger" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./main.js"></script>
 

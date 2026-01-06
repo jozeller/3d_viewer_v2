@@ -69,6 +69,9 @@ create table public.tour_tracks (
   -- optional: vereinfachte 2D-Geometrie für schnellen Viewer
   simplified geometry(MultiLineString, 4326) null,
 
+  -- original file stored in Supabase Storage (path in bucket 'tracks')
+  original_file_path text null,
+
   created_at timestamptz not null default now()
 );
 
@@ -148,7 +151,8 @@ CREATE OR REPLACE FUNCTION public.insert_tour_track(
   p_tour_id uuid,
   p_props jsonb,
   p_geojson json,
-  p_track_name text DEFAULT NULL
+  p_track_name text DEFAULT NULL,
+  p_original_file_path text DEFAULT NULL
 )
 RETURNS uuid AS $$
 DECLARE
@@ -194,7 +198,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.tour_tracks (
-    tour_id, user_id, source, name, track, track_points, simplified, created_at
+    tour_id, user_id, source, name, track, track_points, simplified, original_file_path, created_at
   ) VALUES (
     p_tour_id,
     auth.uid(),
@@ -203,6 +207,7 @@ BEGIN
     geom_ml,
     ST_NPoints(geom_ml),
     ST_Simplify(ST_Force2D(geom_ml), 0.0001),
+    p_original_file_path,
     now()
   ) RETURNING id INTO new_id;
 
@@ -234,10 +239,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP FUNCTION IF EXISTS public.get_tracks_for_user() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.get_tracks_for_user()
-RETURNS TABLE(id uuid, tour_id uuid, name text, geo json, created_at timestamptz) AS $$
+RETURNS TABLE(id uuid, tour_id uuid, name text, geo json, original_file_path text, created_at timestamptz) AS $$
 BEGIN
   RETURN QUERY
-  SELECT t.id, t.tour_id, t.name, ST_AsGeoJSON(t.track)::json, t.created_at
+  SELECT t.id, t.tour_id, t.name, ST_AsGeoJSON(t.track)::json, t.original_file_path, t.created_at
   FROM public.tour_tracks t
   WHERE (
     t.user_id = auth.uid()
@@ -248,3 +253,235 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
+-- RPC: get tour members with email for a tour
+DROP FUNCTION IF EXISTS public.get_tour_members(uuid) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.get_tour_members(p_tour_id uuid)
+RETURNS TABLE(user_id uuid, email text, role text, created_at timestamptz) AS $$
+BEGIN
+  -- Only allow owner or members to see member list
+  IF NOT EXISTS (
+    SELECT 1 FROM public.tours t WHERE t.id = p_tour_id AND t.owner_id = auth.uid()
+  ) AND NOT EXISTS (
+    SELECT 1 FROM public.tour_members m WHERE m.tour_id = p_tour_id AND m.user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  RETURN QUERY
+  SELECT tm.user_id, u.email::text, tm.role, tm.created_at
+  FROM public.tour_members tm
+  JOIN auth.users u ON u.id = tm.user_id
+  WHERE tm.tour_id = p_tour_id
+  ORDER BY tm.created_at ASC;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- RPC: remove self from tour (for members, not owner)
+DROP FUNCTION IF EXISTS public.leave_tour(uuid) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.leave_tour(p_tour_id uuid)
+RETURNS boolean AS $$
+BEGIN
+  -- Check that user is a member (not owner)
+  IF NOT EXISTS (
+    SELECT 1 FROM public.tour_members WHERE tour_id = p_tour_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'You are not a member of this tour';
+  END IF;
+
+  DELETE FROM public.tour_members WHERE tour_id = p_tour_id AND user_id = auth.uid();
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
+
+-- RPC: get tour member count
+DROP FUNCTION IF EXISTS public.get_tour_member_count(uuid) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.get_tour_member_count(p_tour_id uuid)
+RETURNS integer AS $$
+BEGIN
+  RETURN (SELECT COUNT(*)::integer FROM public.tour_members WHERE tour_id = p_tour_id);
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- RPC: generate GPX from stored geometry (fallback when no original file)
+DROP FUNCTION IF EXISTS public.get_track_as_gpx(uuid) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.get_track_as_gpx(p_track_id uuid)
+RETURNS text AS $$
+DECLARE
+  track_rec RECORD;
+  gpx_content text;
+BEGIN
+  -- Check access rights
+  SELECT t.id, t.name, t.track, t.tour_id
+  INTO track_rec
+  FROM public.tour_tracks t
+  WHERE t.id = p_track_id
+    AND (
+      t.user_id = auth.uid()
+      OR EXISTS (SELECT 1 FROM public.tours tr WHERE tr.id = t.tour_id AND tr.owner_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.tour_members m WHERE m.tour_id = t.tour_id AND m.user_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.tours tr WHERE tr.id = t.tour_id AND tr.visibility = 'public')
+    );
+
+  IF track_rec IS NULL THEN
+    RAISE EXCEPTION 'Track not found or access denied';
+  END IF;
+
+  -- Generate GPX XML
+  gpx_content := '<?xml version="1.0" encoding="UTF-8"?>' || chr(10) ||
+    '<gpx version="1.1" creator="3D Viewer" xmlns="http://www.topografix.com/GPX/1/1">' || chr(10) ||
+    '  <metadata>' || chr(10) ||
+    '    <name>' || COALESCE(track_rec.name, 'Track') || '</name>' || chr(10) ||
+    '    <time>' || to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') || '</time>' || chr(10) ||
+    '  </metadata>' || chr(10) ||
+    '  <trk>' || chr(10) ||
+    '    <name>' || COALESCE(track_rec.name, 'Track') || '</name>' || chr(10);
+
+  -- Convert each linestring in the multilinestring to a trkseg
+  gpx_content := gpx_content || (
+    SELECT string_agg(
+      '    <trkseg>' || chr(10) ||
+      (
+        SELECT string_agg(
+          '      <trkpt lat="' || ST_Y(pt) || '" lon="' || ST_X(pt) || '">' ||
+          CASE WHEN ST_Z(pt) IS NOT NULL AND ST_Z(pt) != 0 THEN '<ele>' || ST_Z(pt) || '</ele>' ELSE '' END ||
+          '</trkpt>',
+          chr(10)
+        )
+        FROM ST_DumpPoints(geom) AS dp(path, pt)
+        ORDER BY dp.path
+      ) || chr(10) ||
+      '    </trkseg>',
+      chr(10)
+    )
+    FROM ST_Dump(track_rec.track) AS d(path, geom)
+  );
+
+  gpx_content := gpx_content || chr(10) ||
+    '  </trk>' || chr(10) ||
+    '</gpx>';
+
+  RETURN gpx_content;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- =========================
+-- RPC to get track statistics for intelligent camera positioning
+-- =========================
+DROP FUNCTION IF EXISTS public.get_track_view_stats(uuid) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.get_track_view_stats(p_track_id uuid)
+RETURNS json AS $$
+DECLARE
+  track_rec RECORD;
+  first_line geometry;
+  start_pt geometry;
+  end_pt geometry;
+  center_pt geometry;
+  azimuth_rad float;
+  result json;
+BEGIN
+  -- Check access rights and get track
+  SELECT t.id, t.name, t.track, t.tour_id
+  INTO track_rec
+  FROM public.tour_tracks t
+  WHERE t.id = p_track_id
+    AND (
+      t.user_id = auth.uid()
+      OR EXISTS (SELECT 1 FROM public.tours tr WHERE tr.id = t.tour_id AND tr.owner_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.tour_members m WHERE m.tour_id = t.tour_id AND m.user_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.tours tr WHERE tr.id = t.tour_id AND tr.visibility = 'public')
+    );
+
+  IF track_rec IS NULL THEN
+    RAISE EXCEPTION 'Track not found or access denied';
+  END IF;
+
+  -- Get first linestring from multilinestring
+  first_line := ST_GeometryN(track_rec.track, 1);
+  
+  -- Get start and end points
+  start_pt := ST_StartPoint(first_line);
+  end_pt := ST_EndPoint(first_line);
+  
+  -- Get centroid of entire track
+  center_pt := ST_Centroid(track_rec.track);
+  
+  -- Calculate azimuth (direction from start to end) in degrees
+  azimuth_rad := ST_Azimuth(start_pt, end_pt);
+
+  -- Build result JSON
+  result := json_build_object(
+    'center_lon', ST_X(center_pt),
+    'center_lat', ST_Y(center_pt),
+    'start_lon', ST_X(start_pt),
+    'start_lat', ST_Y(start_pt),
+    'start_ele', COALESCE(ST_Z(start_pt), 0),
+    'end_lon', ST_X(end_pt),
+    'end_lat', ST_Y(end_pt),
+    'end_ele', COALESCE(ST_Z(end_pt), 0),
+    'azimuth_deg', degrees(COALESCE(azimuth_rad, 0)),
+    'length_m', ST_Length(track_rec.track::geography),
+    'bbox', json_build_object(
+      'min_lon', ST_XMin(track_rec.track),
+      'min_lat', ST_YMin(track_rec.track),
+      'max_lon', ST_XMax(track_rec.track),
+      'max_lat', ST_YMax(track_rec.track),
+      'min_ele', ST_ZMin(track_rec.track),
+      'max_ele', ST_ZMax(track_rec.track)
+    ),
+    'elevation_gain', GREATEST(0, COALESCE(ST_Z(end_pt), 0) - COALESCE(ST_Z(start_pt), 0))
+  );
+
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- =========================
+-- Storage bucket for track files
+-- =========================
+-- Note: Bucket creation must be done via Supabase Dashboard or API
+-- Bucket name: 'tracks', public: false, file_size_limit: 10MB
+
+-- Storage policies for the 'tracks' bucket
+-- Allow authenticated users to upload to their own folder
+CREATE POLICY "Users can upload to own folder" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'tracks' 
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Allow users to read files they have access to (via tour membership)
+CREATE POLICY "Users can read accessible tracks" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'tracks'
+    AND (
+      -- Own files
+      (storage.foldername(name))[1] = auth.uid()::text
+      -- Or files for tours they own or are member of
+      OR EXISTS (
+        SELECT 1 FROM public.tour_tracks tt
+        JOIN public.tours t ON t.id = tt.tour_id
+        WHERE tt.original_file_path = name
+        AND (
+          t.owner_id = auth.uid()
+          OR tt.user_id = auth.uid()
+          OR EXISTS (SELECT 1 FROM public.tour_members tm WHERE tm.tour_id = t.id AND tm.user_id = auth.uid())
+          OR t.visibility = 'public'
+        )
+      )
+    )
+  );
+
+-- Allow users to delete their own files
+CREATE POLICY "Users can delete own files" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'tracks'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
