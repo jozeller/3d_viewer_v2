@@ -7,8 +7,10 @@
 
   <!-- Cesium (CDN) -->
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Cesium.js"></script>
-  <link href="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-
+  <link
+    href="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Widgets/widgets.css"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
@@ -19,56 +21,214 @@
     <div id="invisibleCredits" style="display:none;"></div>
   </div>
 
-  <!-- Drawer backdrop (click closes drawer) -->
-  <div id="drawerBackdrop" class="hidden" aria-hidden="true"></div>
+  <!-- Backdrop -->
+  <div id="drawerBackdrop" class="is-hidden" aria-hidden="true"></div>
 
-  <!-- Right drawer (legend) -->
-  <aside id="drawer" class="hidden" aria-label="Legende">
-    <div class="drawerHeader">
-      <div class="drawerTitle">
-        <div class="drawerTitleMain">Legende</div>
-        <div class="drawerTitleSub">Layer & Transparenz</div>
+  <!-- Left overlay menu -->
+  <aside id="drawer" class="is-hidden" aria-label="Menu">
+    <!-- Header -->
+    <header class="drawerHeader">
+      <div class="drawerBrand">
+        <div class="drawerTitleMain">3D Viewer</div>
+        <div class="drawerTitleSub">Layers & Legend</div>
       </div>
-      <button id="drawerClose" class="iconBtn" type="button" aria-label="Close">✖</button>
-    </div>
+      <div class="drawerHeaderActions">
+        <button class="infoBtnHeader" type="button" aria-label="Info" title="How to use">
+          ℹ
+        </button>
+        <button
+          id="drawerToggle"
+          class="fab fabInDrawer"
+          type="button"
+          aria-label="Menu"
+        >
+          ✖
+        </button>
+      </div>
+    </header>
 
-    <div class="drawerBody">
-      <ul id="legend"></ul>
-    </div>
+    <!-- Scrollable main section -->
+    <section class="section sectionScroll">
+      <div id="infoPanel" class="infoPanelDropdown is-hidden">
+        <div class="infoPanelContent">
+          <p><strong>Base Maps:</strong> Select a base map</p>
+          <p><strong>Analysis Layers:</strong> Multiple layers can be displayed simultaneously</p>
+          <p><strong>Hazard Maps:</strong> Overlay additional information</p>
+          <p><strong>Transparency:</strong> Adjust the opacity of layers</p>
+        </div>
+      </div>
+
+      <div class="drawer-nav">
+        <button id="navLegend" class="navBtn is-active" type="button">Legend</button>
+        <button id="navMyTours" class="navBtn is-hidden" type="button">My Tours</button>
+      </div>
+
+      <div id="viewLegend">
+        <ul id="legend" class="legendList"></ul>
+      </div>
+
+      <div id="viewMyTours" class="is-hidden">
+        <div class="myToursHeader">
+          <form id="newTourForm">
+            <input id="newTourTitle" placeholder="Tour name" required />
+            <button type="submit" class="pillBtn">Create Tour</button>
+          </form>
+        </div>
+
+        <div id="toursList"></div>
+      </div>
+    </section>
+
+    <!-- Footer: auth area always at the bottom -->
+    <footer class="drawerFooter">
+      <div class="footerDivider"></div>
+
+      <!-- Logged out -->
+      <div id="authFooterLoggedOut" class="authFooterRow">
+        <button id="authOpenLogin" class="pillBtn" type="button">Login</button>
+      </div>
+
+      <!-- Auth panel (login / register) -->
+      <section id="authPanel" class="authPanel is-hidden" aria-label="Authentication">
+        <div class="drawer-nav" role="tablist" aria-label="Auth">
+          <button
+            id="tabLogin"
+            class="navBtn is-active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            Login
+          </button>
+          <button
+            id="tabRegister"
+            class="navBtn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            Register
+          </button>
+        </div>
+
+        <div class="authBox">
+          <div class="authRow">
+            <label class="authLabel" for="authEmail">Email</label>
+            <input
+              id="authEmail"
+              class="authInput"
+              type="email"
+              autocomplete="email"
+            />
+          </div>
+
+          <div class="authRow">
+            <label class="authLabel" for="authPassword">Password</label>
+            <input
+              id="authPassword"
+              class="authInput"
+              type="password"
+              autocomplete="current-password"
+            />
+          </div>
+
+          <!-- Register only -->
+          <div class="authRow is-hidden" id="rowName">
+            <label class="authLabel" for="authName">Name (optional)</label>
+            <input
+              id="authName"
+              class="authInput"
+              type="text"
+              autocomplete="name"
+            />
+          </div>
+
+          <div class="authActions">
+            <button
+              id="btnPrimary"
+              class="pillBtn"
+              type="button"
+            >
+              Login
+            </button>
+            <button
+              id="btnForgotPw"
+              class="pillBtn pillBtnGhost"
+              type="button"
+            >
+              Forgot password?
+            </button>
+          </div>
+          <div id="authMsg" class="authMsg" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Logged in -->
+      <div id="authFooterLoggedIn" class="authFooterRow is-hidden">
+        <div id="authFooterIdentity" class="authFooterIdentity">
+          Welcome
+        </div>
+        <button
+          id="authLogoutBtn"
+          class="pillBtn pillBtnDanger"
+          type="button"
+        >
+          Logout
+        </button>
+      </div>
+    </footer>
   </aside>
 
-  <!-- Burger button (top-right overlay) -->
-  <button id="drawerToggle" class="fab" type="button" aria-label="Menu">☰</button>
+  <!-- Burger toggle (only visible when drawer is closed) -->
+  <button
+    id="drawerToggleBurger"
+    class="fab fabBurger"
+    type="button"
+    aria-label="Menu"
+  >
+    ☰
+  </button>
 
   <script type="module" src="./main.js"></script>
 
   <script>
-    // Drawer state (overlay)
-    const toggleBtn = document.getElementById('drawerToggle');
-    const closeBtn = document.getElementById('drawerClose');
+    const toggleBurger = document.getElementById('drawerToggleBurger');
+    const toggleX = document.getElementById('drawerToggle');
     const drawer = document.getElementById('drawer');
     const backdrop = document.getElementById('drawerBackdrop');
+    const infoBtn = document.querySelector('.infoBtnHeader');
+    const infoPanel = document.getElementById('infoPanel');
+    const authPanelEl = document.getElementById('authPanel');
 
     function openDrawer() {
-      drawer.classList.remove('hidden');
-      backdrop.classList.remove('hidden');
+      drawer.classList.remove('is-hidden');
+      backdrop.classList.remove('is-hidden');
+      document.body.classList.add('drawer-open');
+      toggleBurger.style.display = 'none';
     }
 
     function closeDrawer() {
-      drawer.classList.add('hidden');
-      backdrop.classList.add('hidden');
+      drawer.classList.add('is-hidden');
+      backdrop.classList.add('is-hidden');
+      document.body.classList.remove('drawer-open');
+      toggleBurger.style.display = 'block';
+      if (authPanelEl) {
+        authPanelEl.classList.add('is-hidden');
+        authPanelEl.classList.add('hidden');
+      }
     }
 
-    toggleBtn.addEventListener('click', () => {
-      const isHidden = drawer.classList.contains('hidden');
-      if (isHidden) openDrawer();
-      else closeDrawer();
-    });
+    function toggleInfo() {
+      infoPanel.classList.toggle('is-hidden');
+    }
 
-    closeBtn.addEventListener('click', closeDrawer);
-    backdrop.addEventListener('click', closeDrawer);
+    toggleBurger.addEventListener('click', openDrawer);
+    toggleX.addEventListener('click', closeDrawer);
+    infoBtn.addEventListener('click', toggleInfo);
 
-    // Optional: close with Escape
+    // backdrop soll das Menü nicht mehr schließen
+    // backdrop.addEventListener('click', closeDrawer);
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeDrawer();
     });

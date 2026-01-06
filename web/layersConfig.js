@@ -1,28 +1,7 @@
 export const layersConfig = [
   {
-    key: 'default',
-    name: 'Standard Cesium Imagery',
-    category: 'Basiskarten',
-    order: 9999,
-    type: 'cesium_default',
-    active: false,
-    opacity: 1
-  },
-  {
-    key: 'swissimage',
-    name: 'swisstopo Luftbild',
-    category: 'Basiskarten',
-    order: 99,
-    type: 'wms',
-    url: 'https://wms.geo.admin.ch/',
-    layers: 'ch.swisstopo.swissimage',
-    parameters: { format: 'image/png', transparent: true },
-    active: false,
-    opacity: 1
-  },
-  {
     key: 'pixelkarte_winter',
-    name: 'swisstopo Landeskarte Winter',
+      name: 'swisstopo — Landeskarte Winter',
     category: 'Basiskarten',
     order: 98,
     type: 'wms',
@@ -33,27 +12,118 @@ export const layersConfig = [
     opacity: 1
   },
   {
-    key: 'slope_30',
-    name: 'Hangneigung über 30°',
+    key: 'swissimage',
+      name: 'swisstopo — Luftbild',
+    category: 'Basiskarten',
+    order: 99,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.swisstopo.swissimage',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1
+  },
+  {
+    key: 'pixelkarte_farbe',
+      name: 'swisstopo — Landeskarten (farbig)',
+    category: 'Basiskarten',
+    order: 100,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.swisstopo.pixelkarte-farbe',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1
+  },
+  {
+    key: 'hangneigung_30',
+      name: 'swisstopo — Hangneigung über 30°',
     category: 'Analyse',
-    order: 3,
+    order: 9,
     type: 'wms',
     url: 'https://wms.geo.admin.ch/',
     layers: 'ch.swisstopo.hangneigung-ueber_30',
     parameters: { format: 'image/png', transparent: true },
     active: true,
-    opacity: 0.5
+    opacity: 0.5,
+    collapsible: false
   },
   {
     key: 'skitouren',
-    name: 'swisstopo Skitouren',
+      name: 'swisstopo — Skitouren',
     category: 'Analyse',
-    order: 2,
+    order: 8,
     type: 'wms',
     url: 'https://wms.geo.admin.ch/',
     layers: 'ch.swisstopo-karto.skitouren',
     parameters: { format: 'image/png', transparent: true },
     active: true,
-    opacity: 1
+    opacity: 1,
+    collapsible: false
+  },
+  {
+    key: 'schneeschuhrouten',
+      name: 'swisstopo — Schneeschuhrouten',
+    category: 'Analyse',
+    order: 7,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.swisstopo-karto.schneeschuhrouten',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1,
+    collapsible: true
+  },
+  {
+    key: 'wanderwege',
+      name: 'swisstopo — Wanderwege',
+    category: 'Analyse',
+    order: 6,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.astra.wanderland',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1,
+    collapsible: true
+  },
+  {
+    key: 'ov_haltestellen',
+      name: 'bav — ÖV-Haltestellen',
+    category: 'Analyse',
+    order: 5,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.bav.haltestellen-oev',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1,
+    collapsible: true
+  },
+  {
+    key: 'sac_huetten',
+      name: 'swisstopo — Unterkünfte Winter',
+    category: 'Analyse',
+    order: 4,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.swisstopo.unterkuenfte-winter',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 1,
+    collapsible: true
+  },
+  {
+    key: 'wildtierschutzgebiete',
+      name: 'bafu — Wildtierschutzgebiete',
+    category: 'Analyse',
+    order: 2,
+    type: 'wms',
+    url: 'https://wms.geo.admin.ch/',
+    layers: 'ch.bafu.wrz-jagdbanngebiete_select',
+    parameters: { format: 'image/png', transparent: true },
+    active: false,
+    opacity: 0.6,
+    collapsible: true
   }
 ];
