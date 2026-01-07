@@ -4,6 +4,7 @@ name: Build and Deploy Web to GitHub Pages
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: web
+        working-directory: web  # Alles im Ordner web/ ausführen
 
     steps:
       - name: Checkout repository
@@ -32,18 +33,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Optional: .env.production aus Secrets erstellen
+      # Falls du ENV brauchst, entferne die Kommentare und setze die Secrets in GitHub (Settings → Secrets → Actions)
+      # - name: Create .env.production
+      #   run: |
+      #     echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env.production
+
       - name: Build Vite app
         run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web/dist
+          path: web/dist  # Build-Output-Verzeichnis
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-``
