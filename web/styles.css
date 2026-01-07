@@ -3,8 +3,8 @@
    ========================= */
 :root {
   /* Primary brand color (blue) */
-  --color-primary: #43a4f3;
-  --color-primary-rgb: 67, 164, 243;
+  --color-primary: #2a5af7;
+  --color-primary-rgb: 42, 90, 247;
   
   /* Text colors (dark slate) */
   --color-text: #0f172a;
@@ -55,7 +55,7 @@
   color: var(--color-text);
   cursor: pointer;
   padding: 6px;
-  transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.08s ease, border-color 0.12s ease;
   outline: none;
 }
 
@@ -73,13 +73,11 @@
   font-weight: 700;
   font-size: 13px;
   line-height: 1.2;
-  box-shadow: 0 8px 18px rgba(var(--color-primary-rgb), 0.16);
-  transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.08s ease, border-color 0.12s ease;
 }
 
 .uploadLabel:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(var(--color-primary-rgb), 0.2);
   border-color: rgba(var(--color-primary-rgb), 0.7);
 }
 
@@ -124,6 +122,11 @@ body {
   height: 100%;
 }
 
+/* Hide Cesium fullscreen button */
+.cesium-viewer-fullscreenContainer {
+  display: none !important;
+}
+
 /* Disable map interaction when menu is open */
 
 /* =========================
@@ -156,8 +159,7 @@ body {
   z-index: 1000;
 
   background: var(--color-bg-drawer);
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 16px 0 40px rgba(0, 0, 0, 0.28);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
 
   display: flex;
   flex-direction: column;
@@ -231,7 +233,7 @@ body {
   color: var(--color-text);
   cursor: pointer;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .regionToggle:hover {
@@ -240,7 +242,6 @@ body {
 
 .regionToggle:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .regionFlag {
@@ -252,7 +253,6 @@ body {
   width: 20px;
   height: auto;
   border-radius: 2px;
-  box-shadow: 0 0 1px rgba(0,0,0,0.3);
 }
 
 .regionNameText {
@@ -273,7 +273,6 @@ body {
   background: var(--color-bg-surface);
   border: 1px solid rgba(var(--color-text-rgb), 0.15);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   list-style: none;
   padding: 4px 0;
   min-width: 140px;
@@ -325,7 +324,6 @@ body {
   font-size: 20px;
 
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .fab:hover {
@@ -355,8 +353,47 @@ body {
 }
 
 /* When drawer is open, move toggle next to it (never on top of title) */
+
 body.drawer-open .fab {
   left: 420px; /* drawer width (400px) + spacing */
+}
+
+/* Ensure locator button stays bottom right in desktop mode, even when menu is open */
+@media (min-width: 769px) {
+  body.drawer-open .fabLocator {
+    right: 20px !important;
+    left: auto !important;
+    bottom: 20px !important;
+    z-index: 1500 !important;
+  }
+}
+
+/* =========================
+   Locator Button (bottom right)
+   ========================= */
+.fabLocator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.fabLocator:hover {
+  transform: scale(1.05);
+}
+
+.fabLocator.is-active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.fabLocator.is-loading {
+  opacity: 0.7;
+  cursor: wait;
 }
 
 /* =========================
@@ -439,6 +476,41 @@ body.drawer-open .fab {
   border: none;
   border-top: 1px solid rgba(var(--color-text-rgb), 0.1);
   margin: 12px 0;
+}
+
+/* Performance control */
+.performanceControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.performanceControl label {
+  margin: 0;
+}
+
+.performanceSelect {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--color-text-rgb), 0.2);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.performanceSelect:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.performanceTierLabel {
+  font-size: 11px;
+  color: rgba(var(--color-text-rgb), 0.6);
+  font-style: italic;
 }
 
 /* =========================
@@ -542,7 +614,6 @@ body.drawer-open .fab {
   border-radius: 50%;
   background: rgba(var(--color-primary-rgb), 0.9);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.4);
 }
 
 .legend-item-menu input[type="range"]::-moz-range-thumb {
@@ -552,7 +623,6 @@ body.drawer-open .fab {
   background: rgba(var(--color-primary-rgb), 0.9);
   cursor: pointer;
   border: none;
-  box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.4);
 }
 
 /* Collapsible box for additional layers */
@@ -705,7 +775,6 @@ body.drawer-open .fab {
   border-radius: 10px;
   padding: 10px;
   margin-top: 8px;
-  box-shadow: 0 4px 16px rgba(var(--color-text-rgb), 0.1);
 }
 
 .tourMembersPopup.is-hidden {
@@ -768,7 +837,6 @@ body.drawer-open .fab {
 
 .tourColorPicker:hover {
   border-color: rgba(var(--color-text-rgb), 0.6);
-  box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.2);
 }
 
 .tourDeleteBtn {
@@ -858,13 +926,11 @@ body.drawer-open .fab {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 8px 18px rgba(var(--color-primary-rgb), 0.16);
-  transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.08s ease, border-color 0.12s ease;
 }
 
 .tourFooter .shareBtn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(180, 170, 140, 0.12);
   border-color: rgba(var(--color-primary-rgb), 0.7);
 }
 
@@ -890,7 +956,6 @@ body.drawer-open .fab {
   background: var(--color-menu-bg);
   border: 1px solid var(--color-menu-border);
   border-radius: 12px;
-  box-shadow: 0 10px 24px rgba(var(--color-text-rgb), 0.12), 0 2px 8px rgba(var(--color-text-rgb), 0.10);
   z-index: 1200;
   padding: 4px 0;
   display: flex;
@@ -927,7 +992,7 @@ body.drawer-open .fab {
   font-weight: 600;
   cursor: pointer;
   border-radius: 0;
-  transition: background 0.13s ease, color 0.13s ease, box-shadow 0.13s ease;
+  transition: background 0.13s ease, color 0.13s ease;
 }
 
 .trackMenu li + li,
@@ -1064,7 +1129,6 @@ body.drawer-open .fab {
 .navBtn.is-active {
   background: rgba(var(--color-bg-surface-rgb), 0.95);
   color: rgba(var(--color-primary-rgb), 0.95);
-  box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.1);
 }
 
 /* =========================
@@ -1113,27 +1177,38 @@ body.drawer-open .fab {
   background: var(--color-primary);
   border: 1px solid rgba(var(--color-primary-rgb), 0.55);
   color: var(--color-bg-surface);
-  box-shadow: 0 8px 18px rgba(var(--color-primary-rgb), 0.16);
-  transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.08s ease, border-color 0.12s ease;
 }
 
-.pillBtnGhost {
-  background: rgba(var(--color-bg-surface-rgb), 0.92);
-  color: rgba(var(--color-primary-rgb), 0.9);
-  border: 1px solid rgba(var(--color-primary-rgb), 0.35);
-  box-shadow: none;
-}
-
-.pillBtnGhost:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(var(--color-primary-rgb), 0.12);
-  border-color: rgba(var(--color-primary-rgb), 0.55);
-}
 
 .pillBtn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(var(--color-primary-rgb), 0.2);
   border-color: rgba(var(--color-primary-rgb), 0.7);
+}
+
+/* Text button (link style) */
+.textBtn {
+  background: none;
+  border: none;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(var(--color-primary-rgb), 0.8);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.textBtn:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.textBtn.is-hidden {
+  display: none;
+}
+
+.textBtn.is-visible {
+  display: inline-block;
 }
 
 /* Destructive / secondary: LOGOUT */
@@ -1162,10 +1237,31 @@ body.drawer-open .fab {
   background: rgba(var(--color-bg-surface-rgb), 0.70);
   border-radius: 14px;
   padding: 12px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
 .authRow { margin-bottom: 10px; }
+
+/* Smooth transition for showing/hiding elements in auth panel */
+.authRow {
+  transition: max-height 0.25s ease, margin-bottom 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
+}
+
+.authRow.is-hidden {
+  max-height: 0 !important;
+  overflow: hidden;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.authRow.is-visible {
+  max-height: 80px;
+  margin-bottom: 10px;
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .authLabel {
   display: block;
@@ -1186,7 +1282,8 @@ body.drawer-open .fab {
 
 .authActions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
@@ -1199,14 +1296,13 @@ body.drawer-open .fab {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.08s ease, border-color 0.12s ease;
 }
 
 .authBtnPrimary {
   background: var(--color-primary);
   border-color: rgba(var(--color-primary-rgb), 0.55);
   color: var(--color-bg-surface);
-  box-shadow: 0 8px 18px rgba(var(--color-primary-rgb), 0.16);
 }
 
 .authBtnGhost {
@@ -1217,7 +1313,6 @@ body.drawer-open .fab {
 
 .authBtn:hover, .authBtnPrimary:hover, .authBtnGhost:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(var(--color-text-rgb), 0.08);
   border-color: rgba(var(--color-primary-rgb), 0.4);
 }
 
@@ -1258,7 +1353,6 @@ body.drawer-open .fab {
   max-width: 420px;
   background: var(--color-bg-drawer);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
 
@@ -1382,7 +1476,6 @@ body.drawer-open .fab {
 
 .shareModalInviteBtn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.25);
 }
 
 .shareModalInviteBtn:disabled {
@@ -1429,7 +1522,6 @@ body.drawer-open .fab {
   max-width: 360px;
   background: var(--color-bg-drawer);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   padding: 24px;
   text-align: center;
   animation: confirmModalIn 0.2s ease-out;
@@ -1638,6 +1730,15 @@ body.drawer-open .fab {
   /* Upload button */
   .uploadLabel {
     padding: 12px 16px;
+  }
+  
+  /* Locator button: stays bottom right on mobile, hidden under drawer when open */
+  .fabLocator {
+    bottom: 16px;
+    right: 16px;
+    z-index: 800; /* Below drawer (z-index 900+) so menu covers it */
+    width: 44px;
+    height: 44px;
   }
 }
 

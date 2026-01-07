@@ -53,17 +53,6 @@ export const japan = {
       opacity: 1
     },
     {
-      key: 'world_satellite',
-      name: 'Global Satellite',
-      category: 'Background',
-      order: 200,
-      type: 'xyz',
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      active: false,
-      opacity: 1,
-      isGlobalFallback: true
-    },
-    {
       key: 'gsi_pale',
       name: 'GSI — Pale Map',
       category: 'Base Maps',

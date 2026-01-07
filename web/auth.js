@@ -79,7 +79,11 @@ export function initAuthUI() {
     tabRegister.classList.toggle('is-active', isRegister)
 
     rowName.classList.toggle('is-hidden', !isRegister)
-    rowName.classList.toggle('hidden', !isRegister)
+    rowName.classList.toggle('is-visible', isRegister)
+
+    // Hide "Forgot password" on Register
+    btnForgot.classList.toggle('is-hidden', isRegister)
+    btnForgot.classList.toggle('is-visible', !isRegister)
 
     btnPrimary.textContent = isRegister ? 'Register' : 'Login'
     setMsg('')
@@ -214,9 +218,21 @@ export function initAuthUI() {
   // Logout
   logoutBtn.addEventListener('click', async () => {
     setMsg('')
-    const { error } = await supabase.auth.signOut()
-    if (error) { setMsg(error.message); return }
-    applyLoggedOutUI()
+    console.log('[auth] Logout button clicked')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        setMsg('Logout error: ' + error.message)
+        console.error('Logout error:', error)
+        return
+      }
+      setMsg('Logged out.')
+      console.log('[auth] Logout success')
+      applyLoggedOutUI()
+    } catch (e) {
+      setMsg('Logout Exception: ' + (e?.message || e))
+      console.error('Logout Exception:', e)
+    }
   })
 
   // Keep UI in sync (also covers refresh / token auto-refresh)

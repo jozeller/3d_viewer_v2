@@ -4,6 +4,7 @@ import { addLayersToLegend, syncLegendCheckboxes } from './addLayersToLegend.js'
 import { initAuthUI } from './auth.js'
 import { supabase } from './supabaseClient.js'
 import { gpx as togeojsonGpx, kml as togeojsonKml } from '@tmcw/togeojson'
+import { initPerformanceOptimizations, getPerformanceTier, applyPerformanceSettings, createThrottledCameraHandler } from './performanceConfig.js'
 import './styles.css'
 
 // =========================
@@ -113,8 +114,14 @@ async function updateAuthState() {
   const navMyTours = document.getElementById('navMyTours');
   if (user) {
     navMyTours.classList.remove('is-hidden');
+    // Fallback: Stelle sicher, dass der Button sichtbar ist (z.B. auf Mobile)
+    navMyTours.style.display = '';
+    if (window.getComputedStyle(navMyTours).display === 'none') {
+      navMyTours.style.display = 'block';
+    }
   } else {
     navMyTours.classList.add('is-hidden');
+    navMyTours.style.display = '';
     // if My Tours is shown, switch back to Legend
     const viewMyTours = document.getElementById('viewMyTours');
     if (!viewMyTours.classList.contains('is-hidden')) {
@@ -128,8 +135,8 @@ supabase.auth.onAuthStateChange((_event, _session) => {
   updateAuthState();
 });
 
-// check initial state on page load
-document.addEventListener('DOMContentLoaded', updateAuthState);
+// Initialen Auth-Status erst prüfen, wenn die Drawer-Navigation im DOM ist
+setTimeout(updateAuthState, 0);
 
 
 // =========================
@@ -213,7 +220,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function switchRegion(regionCode) {
+async function switchRegion(regionCode) {
   const region = getRegion(regionCode);
   if (!region) return;
   
@@ -233,7 +240,7 @@ function switchRegion(regionCode) {
   clearAllLayers(viewer);
   
   // Update terrain
-  updateTerrain(viewer, region.terrain);
+  await updateTerrain(viewer, region.terrain);
   
   // Re-init layers with new region config
   layerState = initLayers(viewer, region.layers);
@@ -253,8 +260,8 @@ populateRegionSelect();
 // Get initial region config
 const initialRegion = getRegion(currentRegionCode);
 
-// Create viewer (terrain, basic UI config)
-const viewer = createViewer('cesiumContainer', 'invisibleCredits', initialRegion.terrain);
+// Create viewer (terrain, basic UI config) - async with top-level await
+const viewer = await createViewer('cesiumContainer', 'invisibleCredits', initialRegion.terrain);
 
 // Initial camera position from region config
 viewer.camera.setView({
@@ -277,14 +284,188 @@ layerState = initLayers(viewer, initialRegion.layers);
 addLayersToLegend(layerState, viewer);
 
 // =========================
-// Auto-activate Global Satellite when zoomed out beyond threshold
-// Once activated, stays active until user manually disables it
+// Performance Optimizations
+// Auto-detects device capabilities and applies appropriate settings
 // =========================
-const ZOOM_OUT_THRESHOLD = 50000; // meters - activate satellite above this height
+const performanceTier = initPerformanceOptimizations(viewer);
+console.log('Performance tier applied:', performanceTier);
 
-function getGlobalFallbackLayer() {
-  return layerState.find(l => l.isGlobalFallback);
+// Setup performance mode selector UI
+const performanceModeSelect = document.getElementById('performanceMode');
+const performanceTierLabel = document.getElementById('performanceTierLabel');
+
+if (performanceModeSelect && performanceTierLabel) {
+  // Show auto-detected tier
+  const tierLabels = { low: 'Power Saver', medium: 'Balanced', high: 'High Quality' };
+  performanceTierLabel.textContent = `(Detected: ${tierLabels[performanceTier] || performanceTier})`;
+  
+  // Store user preference
+  const savedMode = localStorage.getItem('performanceMode');
+  if (savedMode) {
+    performanceModeSelect.value = savedMode;
+    if (savedMode !== 'auto') {
+      applyPerformanceSettings(viewer, savedMode);
+    }
+  }
+  
+  performanceModeSelect.addEventListener('change', (e) => {
+    const mode = e.target.value;
+    localStorage.setItem('performanceMode', mode);
+    
+    if (mode === 'auto') {
+      // Re-apply auto-detected settings
+      initPerformanceOptimizations(viewer);
+      performanceTierLabel.textContent = `(Detected: ${tierLabels[performanceTier] || performanceTier})`;
+    } else {
+      // Apply user-selected mode
+      applyPerformanceSettings(viewer, mode);
+      performanceTierLabel.textContent = '';
+    }
+  });
 }
+
+// =========================
+// Locator (Geolocation)
+// Simple toggle: Click to start tracking + fly to position, click again to stop
+// =========================
+const locatorBtn = document.getElementById('locatorBtn');
+
+let locatorState = {
+  watchId: null,
+  isTracking: false,
+  hasCenteredOnce: false,
+  lastPosition: null,
+  userMarker: null,
+  accuracyCircle: null
+};
+
+function updateLocatorMarker(longitude, latitude, accuracy) {
+  const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+  
+  // Update or create marker
+  if (locatorState.userMarker) {
+    locatorState.userMarker.position = position;
+  } else {
+    locatorState.userMarker = viewer.entities.add({
+      position: position,
+      point: {
+        pixelSize: 16,
+        color: Cesium.Color.fromCssColorString('#2a5af7'),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 3,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+      }
+    });
+  }
+  
+  // Update or create accuracy circle
+  if (locatorState.accuracyCircle) {
+    locatorState.accuracyCircle.position = position;
+    locatorState.accuracyCircle.ellipse.semiMajorAxis = accuracy;
+    locatorState.accuracyCircle.ellipse.semiMinorAxis = accuracy;
+  } else {
+    locatorState.accuracyCircle = viewer.entities.add({
+      position: position,
+      ellipse: {
+        semiMajorAxis: accuracy,
+        semiMinorAxis: accuracy,
+        material: Cesium.Color.fromCssColorString('#2a5af7').withAlpha(0.35),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#2a5af7').withAlpha(0.7),
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+      }
+    });
+  }
+}
+
+function flyToPositionVertical(longitude, latitude) {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 1500),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-90),
+      roll: 0
+    },
+    duration: 1.5
+  });
+}
+
+function handlePositionUpdate(position) {
+  const { longitude, latitude, accuracy } = position.coords;
+  locatorState.lastPosition = { longitude, latitude, accuracy };
+  
+  // Update marker and accuracy circle
+  updateLocatorMarker(longitude, latitude, accuracy);
+  
+  // First position received - fly to it
+  if (!locatorState.hasCenteredOnce) {
+    locatorState.hasCenteredOnce = true;
+    flyToPositionVertical(longitude, latitude);
+  }
+  
+  // Update button state
+  locatorBtn.classList.remove('is-loading');
+  locatorBtn.classList.add('is-active');
+}
+
+function handlePositionError(error) {
+  console.warn('Geolocation error:', error.message);
+  locatorBtn.classList.remove('is-loading', 'is-active');
+  locatorState.isTracking = false;
+}
+
+function startTracking() {
+  if (!navigator.geolocation) {
+    console.warn('Geolocation not supported');
+    return;
+  }
+  
+  locatorBtn.classList.add('is-loading');
+  locatorState.isTracking = true;
+  locatorState.hasCenteredOnce = false;
+  
+  locatorState.watchId = navigator.geolocation.watchPosition(
+    handlePositionUpdate,
+    handlePositionError,
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 3000
+    }
+  );
+}
+
+function stopTracking() {
+  if (locatorState.watchId !== null) {
+    navigator.geolocation.clearWatch(locatorState.watchId);
+    locatorState.watchId = null;
+  }
+  
+  // Remove marker and accuracy circle
+  if (locatorState.userMarker) {
+    viewer.entities.remove(locatorState.userMarker);
+    locatorState.userMarker = null;
+  }
+  if (locatorState.accuracyCircle) {
+    viewer.entities.remove(locatorState.accuracyCircle);
+    locatorState.accuracyCircle = null;
+  }
+  
+  locatorState.isTracking = false;
+  locatorState.hasCenteredOnce = false;
+  locatorState.lastPosition = null;
+  locatorBtn.classList.remove('is-active', 'is-loading');
+}
+
+locatorBtn.addEventListener('click', () => {
+  if (!locatorState.isTracking) {
+    startTracking();
+  } else {
+    stopTracking();
+  }
+});
 
 // =========================
 // Auto-switch terrain when outside region bounds
@@ -298,18 +479,10 @@ function isInsideRegionBounds(lon, lat, bounds) {
          lat >= bounds.south && lat <= bounds.north;
 }
 
-viewer.camera.changed.addEventListener(() => {
-  const height = viewer.camera.positionCartographic.height;
+// Use throttled handler for terrain switching to reduce CPU usage
+const handleCameraChange = createThrottledCameraHandler(viewer, () => {
   const lon = Cesium.Math.toDegrees(viewer.camera.positionCartographic.longitude);
   const lat = Cesium.Math.toDegrees(viewer.camera.positionCartographic.latitude);
-  
-  // Auto-activate satellite layer when zoomed out
-  const fallbackLayer = getGlobalFallbackLayer();
-  if (fallbackLayer && height > ZOOM_OUT_THRESHOLD && !fallbackLayer.active) {
-    fallbackLayer.active = true;
-    if (fallbackLayer.viewerLayer) fallbackLayer.viewerLayer.show = true;
-    syncLegendCheckboxes(layerState);
-  }
   
   // Auto-switch terrain based on whether camera is inside region bounds
   const currentRegion = getRegion(currentRegionCode);
@@ -317,14 +490,16 @@ viewer.camera.changed.addEventListener(() => {
   
   if (!insideBounds && !usingGlobalTerrain) {
     // Moved outside region - switch to global terrain
-    useGlobalTerrain(viewer);
+    useGlobalTerrain(viewer); // fire-and-forget async
     usingGlobalTerrain = true;
   } else if (insideBounds && usingGlobalTerrain) {
     // Moved back inside region - restore regional terrain
-    updateTerrain(viewer, currentRegion?.terrain);
+    updateTerrain(viewer, currentRegion?.terrain); // fire-and-forget async
     usingGlobalTerrain = false;
   }
-});
+}, 200); // Throttle to max 5 updates per second
+
+viewer.camera.changed.addEventListener(handleCameraChange);
 
 // My Tours UI
 const navLegend = document.getElementById('navLegend');
@@ -1628,11 +1803,6 @@ viewer.scene.globe.tileLoadProgressEvent.addEventListener((current) => {
   }
 });
 
-// Override Home button
-viewer.homeButton.viewModel.command.beforeExecute.addEventListener((event) => {
-  event.cancel = true;
-  flyToRegion(viewer, getRegion(currentRegionCode).initialView);
-});
 
 // =========================
 // Share Modal Logic

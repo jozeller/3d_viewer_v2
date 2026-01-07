@@ -8,9 +8,9 @@
   <title>3D Viewer</title>
 
   <!-- Cesium (CDN) -->
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Cesium.js"></script>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Cesium.js"></script>
   <link
-    href="https://cesium.com/downloads/cesiumjs/releases/1.100/Build/Cesium/Widgets/widgets.css"
+    href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="./styles.css" />
@@ -46,9 +46,6 @@
         </div>
       </div>
       <div class="drawerHeaderActions">
-        <button class="infoBtnHeader" type="button" aria-label="Info" title="How to use">
-          ℹ
-        </button>
         <button
           id="drawerToggle"
           class="fab fabInDrawer"
@@ -70,6 +67,17 @@
           <p><strong>Transparency:</strong> Adjust the opacity of layers</p>
           <hr class="infoDivider" />
           <p><strong>My Tours:</strong> Log in to create tours, upload GPX tracks, and share them with others</p>
+          <hr class="infoDivider" />
+          <div class="performanceControl">
+            <label for="performanceMode"><strong>Performance:</strong></label>
+            <select id="performanceMode" class="performanceSelect">
+              <option value="auto">Auto</option>
+              <option value="low">Power Saver</option>
+              <option value="medium">Balanced</option>
+              <option value="high">High Quality</option>
+            </select>
+            <span id="performanceTierLabel" class="performanceTierLabel"></span>
+          </div>
         </div>
       </div>
 
@@ -170,7 +178,7 @@
             </button>
             <button
               id="btnForgotPw"
-              class="pillBtn pillBtnGhost"
+              class="textBtn is-visible"
               type="button"
             >
               Forgot password?
@@ -204,6 +212,23 @@
     aria-label="Menu"
   >
     ☰
+  </button>
+
+  <!-- Locator button (bottom right) -->
+  <button
+    id="locatorBtn"
+    class="fab fabLocator"
+    type="button"
+    aria-label="My Location"
+    title="My Location"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <line x1="12" y1="2" x2="12" y2="6"/>
+      <line x1="12" y1="18" x2="12" y2="22"/>
+      <line x1="2" y1="12" x2="6" y2="12"/>
+      <line x1="18" y1="12" x2="22" y2="12"/>
+    </svg>
   </button>
 
   <!-- Share Modal Overlay -->

@@ -57,17 +57,6 @@ export const switzerland = {
       opacity: 1
     },
     {
-      key: 'world_satellite',
-      name: 'Global Satellite',
-      category: 'Background',
-      order: 200,
-      type: 'xyz',
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      active: false,
-      opacity: 1,
-      isGlobalFallback: true
-    },
-    {
       key: 'pixelkarte_farbe',
       name: 'swisstopo — National Maps (Color)',
       category: 'Base Maps',

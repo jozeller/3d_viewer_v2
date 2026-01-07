@@ -4,28 +4,32 @@
 
 let currentViewer = null;
 
-export function createViewer(containerId, creditsContainerId, terrainConfig) {
-  // Set Cesium Ion token if available (required for geocoder/search)
+export async function createViewer(containerId, creditsContainerId, terrainConfig) {
+  // Set Cesium Ion token (required for Bing Maps and World Terrain)
   const cesiumToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
   if (cesiumToken) {
     Cesium.Ion.defaultAccessToken = cesiumToken;
+  } else {
+    console.warn('No VITE_CESIUM_ION_TOKEN set - Bing Maps will not load');
   }
 
-  // Create terrain provider based on config
-  let terrainProvider;
-  if (terrainConfig?.type === 'cesium-world') {
-    terrainProvider = Cesium.createWorldTerrain();
-  } else if (terrainConfig?.type === 'url' && terrainConfig?.url) {
-    terrainProvider = new Cesium.CesiumTerrainProvider({
-      url: terrainConfig.url
-    });
-  } else {
-    // Default: Cesium World Terrain
-    terrainProvider = Cesium.createWorldTerrain();
+  // Create Bing Maps base layer via Ion
+  let baseLayer;
+  try {
+    const bingImagery = await Cesium.IonImageryProvider.fromAssetId(2); // Bing Maps Aerial
+    baseLayer = new Cesium.ImageryLayer(bingImagery);
+    console.log('Bing Maps loaded successfully');
+  } catch (e) {
+    console.error('Failed to load Bing Maps from Ion:', e);
+    // Fallback to OpenStreetMap
+    baseLayer = new Cesium.ImageryLayer(
+      new Cesium.OpenStreetMapImageryProvider({
+        url: 'https://tile.openstreetmap.org/'
+      })
+    );
   }
 
   const viewer = new Cesium.Viewer(containerId, {
-    terrainProvider,
     baseLayerPicker: false,
     infoBox: false,
     animation: false,
@@ -33,31 +37,42 @@ export function createViewer(containerId, creditsContainerId, terrainConfig) {
     selectionIndicator: false,
     navigationHelpButton: false,
     sceneModePicker: false,
-    creditContainer: document.getElementById(creditsContainerId)
+    fullscreenButton: false,
+    homeButton: false, // Home-Button komplett deaktivieren
+    geocoder: true, // Cesium Search-Widget (Such-Icon) aktivieren
+    creditContainer: document.getElementById(creditsContainerId),
+    baseLayer: baseLayer
   });
+
+  // Set terrain asynchronously
+  await applyTerrain(viewer, terrainConfig);
 
   currentViewer = viewer;
   return viewer;
 }
 
-// Update terrain provider for region switch
-export function updateTerrain(viewer, terrainConfig) {
+// Helper to apply terrain (async)
+async function applyTerrain(viewer, terrainConfig) {
   let terrainProvider;
   if (terrainConfig?.type === 'cesium-world') {
-    terrainProvider = Cesium.createWorldTerrain();
+    terrainProvider = await Cesium.createWorldTerrainAsync();
   } else if (terrainConfig?.type === 'url' && terrainConfig?.url) {
-    terrainProvider = new Cesium.CesiumTerrainProvider({
-      url: terrainConfig.url
-    });
+    terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(terrainConfig.url);
   } else {
-    terrainProvider = Cesium.createWorldTerrain();
+    // Default: Cesium World Terrain
+    terrainProvider = await Cesium.createWorldTerrainAsync();
   }
   viewer.terrainProvider = terrainProvider;
 }
 
+// Update terrain provider for region switch
+export async function updateTerrain(viewer, terrainConfig) {
+  await applyTerrain(viewer, terrainConfig);
+}
+
 // Switch to global Cesium World Terrain (for areas outside regional terrain)
-export function useGlobalTerrain(viewer) {
-  viewer.terrainProvider = Cesium.createWorldTerrain();
+export async function useGlobalTerrain(viewer) {
+  viewer.terrainProvider = await Cesium.createWorldTerrainAsync();
 }
 
 export function flyToRegion(viewer, initialView) {
@@ -88,15 +103,17 @@ export function performInitialZoom(viewer) {
   });
 }
 
-function makeProvider(layerDef, viewer, defaultImageryProvider) {
-  // Note: default Cesium imagery provider is obtained from viewer at startup.
-  if (layerDef.type === 'cesium_default') return defaultImageryProvider;
-
+function makeProvider(layerDef, viewer) {
   if (layerDef.type === 'wms') {
     return new Cesium.WebMapServiceImageryProvider({
       url: layerDef.url,
       layers: layerDef.layers,
-      parameters: layerDef.parameters ?? { format: 'image/png', transparent: true }
+      parameters: layerDef.parameters ?? { format: 'image/png', transparent: true },
+      // Performance: enable tile caching
+      enablePickFeatures: false,
+      // Use PNG8 where possible for smaller tiles
+      tileWidth: 256,
+      tileHeight: 256
     });
   }
 
@@ -104,7 +121,9 @@ function makeProvider(layerDef, viewer, defaultImageryProvider) {
     return new Cesium.UrlTemplateImageryProvider({
       url: layerDef.url,
       minimumLevel: layerDef.minimumLevel ?? 0,
-      maximumLevel: layerDef.maximumLevel ?? 18
+      maximumLevel: layerDef.maximumLevel ?? 18,
+      // Performance: disable feature picking for overlay tiles
+      enablePickFeatures: false
     });
   }
 
@@ -165,12 +184,8 @@ export function setExclusiveCategory(layerState, viewer, category, activeKey) {
 }
 
 export function initLayers(viewer, layersConfig) {
-  // Capture Cesium default imagery provider and remove it from layer stack,
-  // so it can be managed like any other layer.
-  const defaultProvider = viewer.imageryLayers.get(0)?.imageryProvider;
-  if (viewer.imageryLayers.get(0)) {
-    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
-  }
+  // Keep Bing Maps base layer at index 0 - don't remove it
+  // All other layers will be added on top
 
   // Build runtime layer state
   const layerState = layersConfig.map(def => ({
@@ -181,19 +196,12 @@ export function initLayers(viewer, layersConfig) {
 
   // Create providers
   for (const l of layerState) {
-    l.provider = makeProvider(l, viewer, defaultProvider);
+    l.provider = makeProvider(l, viewer);
   }
 
   // Add only active layers once
   for (const l of layerState) {
     if (l.active) ensureAdded(l, viewer);
-  }
-  
-  // Pre-add global fallback layer (but keep hidden) for faster switching
-  const fallback = layerState.find(l => l.isGlobalFallback);
-  if (fallback && !fallback.viewerLayer) {
-    ensureAdded(fallback, viewer);
-    fallback.viewerLayer.show = false;
   }
 
   // Enforce order and visibility
@@ -203,7 +211,10 @@ export function initLayers(viewer, layersConfig) {
   return layerState;
 }
 
-// Remove all imagery layers (used when switching regions)
+// Remove all imagery layers except base layer (used when switching regions)
 export function clearAllLayers(viewer) {
-  viewer.imageryLayers.removeAll();
+  // Keep the first layer (Bing Maps base) and remove all others
+  while (viewer.imageryLayers.length > 1) {
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(1));
+  }
 }
