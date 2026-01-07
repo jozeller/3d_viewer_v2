@@ -86,6 +86,52 @@ create index tour_tracks_simplified_gix
   on public.tour_tracks
   using gist (simplified);
 
+-- RLS und Policies für tours und tour_members
+ALTER TABLE public.tours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_members ENABLE ROW LEVEL SECURITY;
+
+-- tours: Policies
+CREATE POLICY "select_own_or_public" ON public.tours
+  FOR SELECT
+  USING (
+    owner_id = auth.uid()
+    OR visibility = 'public'
+  );
+
+CREATE POLICY "insert_own" ON public.tours
+  FOR INSERT
+  WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "update_own" ON public.tours
+  FOR UPDATE
+  USING (owner_id = auth.uid());
+
+CREATE POLICY "delete_own" ON public.tours
+  FOR DELETE
+  USING (owner_id = auth.uid());
+
+-- tour_members: Policies
+CREATE POLICY "select_member_or_owner" ON public.tour_members
+  FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+  );
+
+CREATE POLICY "insert_owner_or_self" ON public.tour_members
+  FOR INSERT
+  WITH CHECK (
+    user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+  );
+
+CREATE POLICY "delete_owner_or_self" ON public.tour_members
+  FOR DELETE
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+  );
+
 -- updated_at Trigger
 create or replace function public.set_updated_at()
 returns trigger
