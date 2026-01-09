@@ -44,6 +44,7 @@ export function initAuthUI() {
   const logoutBtn = $('authLogoutBtn')
   const drawerToggle = $('drawerToggle')
   const drawerBackdrop = $('drawerBackdrop')
+  const languageToggleBtn = $('languageToggleBtn')
 
   const panel = $('authPanel')
   const tabLogin = $('tabLogin')
@@ -85,7 +86,7 @@ export function initAuthUI() {
     btnForgot.classList.toggle('is-hidden', isRegister)
     btnForgot.classList.toggle('is-visible', !isRegister)
 
-    btnPrimary.textContent = isRegister ? 'Register' : 'Login'
+    btnPrimary.textContent = isRegister ? window.i18n.getTranslation('register') : window.i18n.getTranslation('login')
     setMsg('')
   }
 
@@ -110,13 +111,16 @@ export function initAuthUI() {
     hide(loggedInRow)
     password.value = ''
     closePanel()
+    // Language toggle stays in header
   }
 
   function applyLoggedInUI(user) {
-    identity.textContent = `Welcome, ${displayNameFromUser(user)}`
-    hide(loggedOutRow)
-    show(loggedInRow)
-    closePanel()
+    const welcomeText = window.i18n ? window.i18n.getTranslation('welcome') : 'Willkommen';
+    identity.textContent = welcomeText + ', ' + displayNameFromUser(user);
+    hide(loggedOutRow);
+    show(loggedInRow);
+    closePanel();
+    // Language toggle stays in header
   }
 
   async function refreshUI() {

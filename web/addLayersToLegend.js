@@ -16,6 +16,19 @@ const radioGroups = ['Base Maps'];
 // Category display order in the legend
 const categoryOrder = ['Analysis', 'Hazard Maps', 'Base Maps', 'Background'];
 
+// Translation mapping for categories
+const categoryTranslations = {
+  'Analysis': 'analysisLayers',
+  'Hazard Maps': 'hazardMaps', 
+  'Base Maps': 'baseMaps',
+  'Background': 'background'
+};
+
+function getTranslatedCategoryName(category) {
+  const key = categoryTranslations[category];
+  return key && window.i18n ? window.i18n.getTranslation(key) : category;
+}
+
 export function addLayersToLegend(layerState, viewer) {
   const grouped = layerState.reduce((acc, layer) => {
     (acc[layer.category] ||= []).push(layer);
@@ -32,7 +45,7 @@ export function addLayersToLegend(layerState, viewer) {
     categoryContainer.className = 'legend-category';
 
     const h = document.createElement('h3');
-    h.textContent = category;
+    h.textContent = getTranslatedCategoryName(category);
     categoryContainer.appendChild(h);
 
     const isRadio = radioGroups.includes(category);
@@ -71,7 +84,7 @@ function createLayerItem(layer, isRadio, layerState, viewer) {
   input.checked = !!layer.active;
 
   const layerLabel = document.createElement('span');
-  layerLabel.textContent = layer.name;
+  layerLabel.textContent = window.i18n ? window.i18n.getTranslation(layer.name) : layer.name;
 
   input.addEventListener('change', () => {
     if (isRadio) {
@@ -86,7 +99,7 @@ function createLayerItem(layer, isRadio, layerState, viewer) {
   menu.className = 'legend-item-menu';
 
   const label = document.createElement('label');
-  label.textContent = 'Opacity';
+  label.textContent = window.i18n ? window.i18n.getTranslation('opacity') : 'Opacity';
 
   const range = document.createElement('input');
   range.type = 'range';
@@ -122,7 +135,15 @@ function createCollapsibleBox(layers, isRadio, layerState, viewer) {
   const button = document.createElement('button');
   button.className = 'legend-collapsible-btn';
   button.type = 'button';
-  button.textContent = `+ Show ${layers.length} more item${layers.length !== 1 ? 's' : ''}`;
+  const count = layers.length;
+  const plural = count !== 1 ? 's' : '';
+  const germanPlural = count !== 1 ? 'e' : '';
+  const germanMore = count !== 1 ? 'r' : '';
+  button.textContent = (window.i18n ? window.i18n.getTranslation('showMoreItems') : '+ Show {count} more item{plural}')
+    .replace('{count}', count)
+    .replace('{plural}', plural)
+    .replace('{e}', germanPlural)
+    .replace('{r}', germanMore);
 
   const hiddenLayers = document.createElement('div');
   hiddenLayers.className = 'legend-collapsible-items is-hidden';
@@ -134,9 +155,20 @@ function createCollapsibleBox(layers, isRadio, layerState, viewer) {
 
   button.addEventListener('click', () => {
     const isHidden = hiddenLayers.classList.toggle('is-hidden');
+    const count = layers.length;
+    const plural = count !== 1 ? 's' : '';
+    const germanPlural = count !== 1 ? 'e' : '';
+    const germanMore = count !== 1 ? 'r' : '';
     button.textContent = isHidden 
-      ? `+ Show ${layers.length} more item${layers.length !== 1 ? 's' : ''}`
-      : `− Hide ${layers.length} item${layers.length !== 1 ? 's' : ''}`;
+      ? (window.i18n ? window.i18n.getTranslation('showMoreItems') : '+ Show {count} more item{plural}')
+          .replace('{count}', count)
+          .replace('{plural}', plural)
+          .replace('{e}', germanPlural)
+          .replace('{r}', germanMore)
+      : (window.i18n ? window.i18n.getTranslation('hideItems') : '− Hide {count} item{plural}')
+          .replace('{count}', count)
+          .replace('{plural}', plural)
+          .replace('{e}', germanPlural);
     button.classList.toggle('open', !isHidden);
   });
 
@@ -156,3 +188,6 @@ export function syncLegendCheckboxes(layerState) {
     }
   }
 }
+
+// Make addLayersToLegend globally available for translations
+window.addLayersToLegend = addLayersToLegend;
