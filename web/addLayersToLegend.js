@@ -189,5 +189,20 @@ export function syncLegendCheckboxes(layerState) {
   }
 }
 
-// Make addLayersToLegend globally available for translations
+// Update legend texts without rebuilding the legend
+export function updateLegendTexts(layerState) {
+  for (const layer of layerState) {
+    const input = document.getElementById(`layer-input-${sanitize(layer.key)}`);
+    if (input) {
+      // The label is the next sibling span
+      const label = input.nextElementSibling;
+      if (label && label.tagName === 'SPAN') {
+        label.textContent = window.i18n ? window.i18n.getTranslation(layer.name) : layer.name;
+      }
+    }
+  }
+}
+
+// Make functions globally available
 window.addLayersToLegend = addLayersToLegend;
+window.updateLegendTexts = updateLegendTexts;
