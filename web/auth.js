@@ -111,10 +111,7 @@ export function initAuthUI() {
     hide(loggedInRow)
     password.value = ''
     closePanel()
-    // Move language toggle to logged out row
-    if (languageToggleBtn && loggedOutRow && !loggedOutRow.contains(languageToggleBtn)) {
-      loggedOutRow.insertBefore(languageToggleBtn, openLoginBtn)
-    }
+    // Language toggle stays in header
   }
 
   function applyLoggedInUI(user) {
@@ -123,10 +120,7 @@ export function initAuthUI() {
     hide(loggedOutRow);
     show(loggedInRow);
     closePanel();
-    // Move language toggle to logged in row
-    if (languageToggleBtn && loggedInRow && !loggedInRow.contains(languageToggleBtn)) {
-      loggedInRow.insertBefore(languageToggleBtn, identity)
-    }
+    // Language toggle stays in header
   }
 
   async function refreshUI() {

@@ -586,6 +586,12 @@ async function currentUser() {
   return data?.user ?? null;
 }
 
+// Helper function to truncate tour titles that are too long
+function truncateTitle(title, maxLength = 40) {
+  if (title.length <= maxLength) return title;
+  return title.substring(0, maxLength - 3) + '...';
+}
+
 async function loadMyTours() {
   toursList.innerHTML = window.i18n.getTranslation('loading');
   
@@ -703,7 +709,7 @@ async function loadMyTours() {
 
     el.innerHTML = `
       <div class="tourHeader" data-tour="${t.id}">
-        <strong class="tourTitle" data-tour="${t.id}" data-editable="false">${t.title}</strong>
+        <strong class="tourTitle" data-tour="${t.id}" data-editable="false">${truncateTitle(t.title)}</strong>
         <div class="tourHeaderActions">
           ${shareIcon}
           <div class="tourMenuWrap">
@@ -1020,7 +1026,7 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
   for (const tr of tracks) {
     const row = document.createElement('div');
     row.className = 'trackRow';
-    const trackName = tr.name || new Date(tr.created_at).toLocaleString();
+    const trackName = truncateTitle(tr.name || new Date(tr.created_at).toLocaleString(), 100);
     // Default color for track (use property or fallback to tour color)
     const defaultColor = tr.color || pickColorForTourHex(tr.id);
     // Permission: can delete if tour owner OR track creator
