@@ -90,7 +90,18 @@
     "layer_wanderwege": "swisstopo — Wanderwege",
     "layer_ov_haltestellen": "bav — ÖV-Haltestellen",
     "layer_sac_huetten": "swisstopo — Winterunterkünfte",
-    "layer_wildtierschutzgebiete": "bafu — Wildtierschutzgebiete"
+    "layer_wildtierschutzgebiete": "bafu — Wildtierschutzgebiete",
+    "layer_gsi_std": "GSI — Standardkarte (日本語)",
+    "layer_osm_english": "OpenStreetMap (Englisch)",
+    "layer_gsi_pale": "GSI — Blasse Karte",
+    "layer_gsi_photo": "GSI — Luftbild",
+    "layer_gsi_slope": "GSI — Hangneigung",
+    "layer_gsi_slopezone_avalanche": "GSI — Hangneigungszone (Lawinen)",
+    "layer_gsi_hillshade": "GSI — Schummerung",
+    "layer_gsi_lcm": "GSI — Landbedingungen",
+    "layer_gsi_flood": "GSI — Hochwassergefahr",
+    "layer_gsi_landslide": "GSI — Erdrutschrisiko",
+    "layer_gsi_tsunami": "GSI — Tsunami-Gefahr"
   },
   "en": {
     "appTitle": "3D Viewer",
@@ -188,6 +199,17 @@
     "layer_wanderwege": "swisstopo — Hiking Trails",
     "layer_ov_haltestellen": "bav — Public Transport Stops",
     "layer_sac_huetten": "swisstopo — Winter Accommodations",
-    "layer_wildtierschutzgebiete": "bafu — Wildlife Protection Areas"
+    "layer_wildtierschutzgebiete": "bafu — Wildlife Protection Areas",
+    "layer_gsi_std": "GSI — Standard Map (日本語)",
+    "layer_osm_english": "OpenStreetMap (English)",
+    "layer_gsi_pale": "GSI — Pale Map",
+    "layer_gsi_photo": "GSI — Aerial Photo",
+    "layer_gsi_slope": "GSI — Slope Gradient",
+    "layer_gsi_slopezone_avalanche": "GSI — Slope Zone (Avalanche)",
+    "layer_gsi_hillshade": "GSI — Hillshade",
+    "layer_gsi_lcm": "GSI — Land Condition",
+    "layer_gsi_flood": "GSI — Flood Hazard",
+    "layer_gsi_landslide": "GSI — Landslide Risk",
+    "layer_gsi_tsunami": "GSI — Tsunami Hazard"
   }
 }
