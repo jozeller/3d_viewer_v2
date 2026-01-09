@@ -5,6 +5,7 @@ import { initAuthUI } from './auth.js'
 import { supabase } from './supabaseClient.js'
 import { gpx as togeojsonGpx, kml as togeojsonKml } from '@tmcw/togeojson'
 import { initPerformanceOptimizations, getPerformanceTier, applyPerformanceSettings, createThrottledCameraHandler } from './performanceConfig.js'
+import { i18n } from './translations.js'
 import './styles.css'
 
 // =========================
@@ -210,6 +211,27 @@ function populateRegionSelect() {
 // Make populateRegionSelect available globally for translations
 window.populateRegionSelect = populateRegionSelect;
 
+// Function to update region dropdown texts without rebuilding the list
+function updateRegionDropdownTexts() {
+  const currentRegion = getRegion(currentRegionCode);
+  
+  // Update toggle button text
+  regionNameEl.textContent = window.i18n ? window.i18n.getTranslation(currentRegion.code.toLowerCase()) : currentRegion.name;
+  
+  // Update option texts
+  regionOptions.querySelectorAll('.regionOption').forEach(opt => {
+    const code = opt.dataset.code;
+    const region = getRegion(code);
+    const nameText = opt.querySelector('.regionNameText');
+    if (nameText) {
+      nameText.textContent = window.i18n ? window.i18n.getTranslation(region.code.toLowerCase()) : region.name;
+    }
+  });
+}
+
+// Make updateRegionDropdownTexts available globally for translations
+window.updateRegionDropdownTexts = updateRegionDropdownTexts;
+
 // Toggle dropdown open/close
 regionToggle.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -247,6 +269,9 @@ async function switchRegion(regionCode) {
   
   // Re-init layers with new region config
   layerState = initLayers(viewer, region.layers);
+  
+  // Update global layerState
+  window.layerState = layerState;
   
   // Rebuild legend UI
   const legendEl = document.getElementById('legend');
@@ -2007,3 +2032,6 @@ shareModalEmails.addEventListener('keydown', (e) => {
     shareWithEmails();
   }
 });
+
+// Initialize translations
+i18n.initTranslations();

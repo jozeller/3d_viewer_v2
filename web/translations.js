@@ -20,18 +20,14 @@ function setLanguage(lang) {
   localStorage.setItem('language', lang);
   updateTexts();
   
-  // Update region dropdown when language changes
-  if (window.populateRegionSelect) {
-    window.populateRegionSelect();
+  // Update region dropdown texts when language changes (without rebuilding the list)
+  if (window.updateRegionDropdownTexts) {
+    window.updateRegionDropdownTexts();
   }
 
-  // Update legend when language changes
-  if (window.addLayersToLegend && window.layerState && window.viewer) {
-    const legendEl = document.getElementById('legend');
-    if (legendEl) {
-      legendEl.innerHTML = '';
-      window.addLayersToLegend(window.layerState, window.viewer);
-    }
+  // Update legend texts when language changes (without rebuilding the legend)
+  if (window.updateLegendTexts && window.layerState) {
+    window.updateLegendTexts(window.layerState);
   }
 }
 
@@ -88,7 +84,7 @@ function updateTexts() {
 }
 
 // Initialize translations
-document.addEventListener('DOMContentLoaded', async () => {
+async function initTranslations() {
   await loadTranslations();
 
   // Load saved language or detect from browser
@@ -115,11 +111,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateButtonText();
     });
   }
-});
+}
 
 // Export for use in other modules
-window.i18n = {
+export const i18n = {
   setLanguage,
   getTranslation,
-  updateTexts
+  updateTexts,
+  initTranslations
 };
+
+// For backward compatibility, also set on window
+window.i18n = i18n;
