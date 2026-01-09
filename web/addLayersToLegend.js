@@ -14,10 +14,11 @@ const sanitize = (s) => s.replace(/[^a-zA-Z0-9-_]/g, '-');
 const radioGroups = ['Base Maps'];
 
 // Category display order in the legend
-const categoryOrder = ['Analysis', 'Hazard Maps', 'Base Maps', 'Background'];
+const categoryOrder = ['3D Layers', 'Analysis', 'Hazard Maps', 'Base Maps', 'Background'];
 
 // Translation mapping for categories
 const categoryTranslations = {
+  '3D Layers': '3dLayers',
   'Analysis': 'analysisLayers',
   'Hazard Maps': 'hazardMaps', 
   'Base Maps': 'baseMaps',
@@ -99,22 +100,25 @@ function createLayerItem(layer, isRadio, layerState, viewer) {
   const menu = document.createElement('div');
   menu.className = 'legend-item-menu';
 
-  const label = document.createElement('label');
-  label.textContent = window.i18n ? window.i18n.getTranslation('opacity') : 'Opacity';
+  // Only add opacity slider for non-3D tileset layers
+  if (layer.type !== '3dtiles') {
+    const label = document.createElement('label');
+    label.textContent = window.i18n ? window.i18n.getTranslation('opacity') : 'Opacity';
 
-  const range = document.createElement('input');
-  range.type = 'range';
-  range.min = 0;
-  range.max = 1;
-  range.step = 0.1;
-  range.value = layer.opacity ?? 1;
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = 0;
+    range.max = 1;
+    range.step = 0.1;
+    range.value = layer.opacity ?? 1;
 
-  range.addEventListener('input', () => {
-    setLayerOpacity(layer, viewer, parseFloat(range.value));
-  });
+    range.addEventListener('input', () => {
+      setLayerOpacity(layer, viewer, parseFloat(range.value));
+    });
 
-  menu.appendChild(label);
-  menu.appendChild(range);
+    menu.appendChild(label);
+    menu.appendChild(range);
+  }
 
   title.addEventListener('click', (e) => {
     if (e.target === input) return;

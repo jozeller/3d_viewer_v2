@@ -158,6 +158,29 @@ export const switzerland = {
       active: false,
       opacity: 0.6,
       collapsible: true
+    },
+    // === 3D Layers ===
+    {
+      key: 'swissbuildings3d',
+      name: 'layer_swissbuildings3d',
+      category: '3D Layers',
+      order: 10,
+      type: '3dtiles',
+      url: 'https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json',
+      active: false,
+      opacity: 1,
+      collapsible: false
+    },
+    {
+      key: 'vegetation3d',
+      name: 'layer_vegetation3d',
+      category: '3D Layers',
+      order: 7,
+      type: '3dtiles',
+      url: 'https://3d.geo.admin.ch/ch.swisstopo.vegetation.3d/v1/tileset.json',
+      active: false,
+      opacity: 1,
+      collapsible: false
     }
   ]
 };

@@ -28,6 +28,7 @@
     "leaveTour": "Tour verlassen",
     "baseMaps": "Basiskarten",
     "selectBaseMap": "Wähle eine Basiskarte",
+    "3dLayers": "3D-Layer",
     "analysisLayers": "Analyse-Layer",
     "multipleLayers": "Mehrere Layer können gleichzeitig angezeigt werden",
     "hazardMaps": "Gefahrenkarten",
@@ -101,7 +102,9 @@
     "layer_gsi_lcm": "GSI — Landbedingungen",
     "layer_gsi_flood": "GSI — Hochwassergefahr",
     "layer_gsi_landslide": "GSI — Erdrutschrisiko",
-    "layer_gsi_tsunami": "GSI — Tsunami-Gefahr"
+    "layer_gsi_tsunami": "GSI — Tsunami-Gefahr",
+    "layer_swissbuildings3d": "swisstopo — 3D-Gebäude",
+    "layer_vegetation3d": "swisstopo — 3D-Vegetation"
   },
   "en": {
     "appTitle": "3D Viewer",
@@ -132,6 +135,7 @@
     "leaveTour": "Leave tour",
     "baseMaps": "Base Maps",
     "selectBaseMap": "Select a base map",
+    "3dLayers": "3D Layers",
     "analysisLayers": "Analysis Layers",
     "multipleLayers": "Multiple layers can be displayed simultaneously",
     "hazardMaps": "Hazard Maps",
@@ -210,6 +214,8 @@
     "layer_gsi_lcm": "GSI — Land Condition",
     "layer_gsi_flood": "GSI — Flood Hazard",
     "layer_gsi_landslide": "GSI — Landslide Risk",
-    "layer_gsi_tsunami": "GSI — Tsunami Hazard"
+    "layer_gsi_tsunami": "GSI — Tsunami Hazard",
+    "layer_swissbuildings3d": "swisstopo — 3D Buildings",
+    "layer_vegetation3d": "swisstopo — 3D Vegetation"
   }
 }
