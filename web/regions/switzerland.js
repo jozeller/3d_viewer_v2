@@ -34,7 +34,7 @@ export const switzerland = {
   layers: [
     {
       key: 'pixelkarte_winter',
-      name: 'swisstopo — Winter Map',
+      name: 'layer_pixelkarte_winter',
       category: 'Base Maps',
       order: 98,
       type: 'wms',
@@ -46,7 +46,7 @@ export const switzerland = {
     },
     {
       key: 'swissimage',
-      name: 'swisstopo — Aerial Image',
+      name: 'layer_swissimage',
       category: 'Base Maps',
       order: 99,
       type: 'wms',
@@ -58,7 +58,7 @@ export const switzerland = {
     },
     {
       key: 'pixelkarte_farbe',
-      name: 'swisstopo — National Maps (Color)',
+      name: 'layer_pixelkarte_farbe',
       category: 'Base Maps',
       order: 100,
       type: 'wms',
@@ -70,7 +70,7 @@ export const switzerland = {
     },
     {
       key: 'hangneigung_30',
-      name: 'swisstopo — Slope over 30°',
+      name: 'layer_hangneigung_30',
       category: 'Analysis',
       order: 9,
       type: 'wms',
@@ -83,7 +83,7 @@ export const switzerland = {
     },
     {
       key: 'skitouren',
-      name: 'swisstopo — Ski Tours',
+      name: 'layer_skitouren',
       category: 'Analysis',
       order: 8,
       type: 'wms',
@@ -96,7 +96,7 @@ export const switzerland = {
     },
     {
       key: 'schneeschuhrouten',
-      name: 'swisstopo — Snowshoe Routes',
+      name: 'layer_schneeschuhrouten',
       category: 'Analysis',
       order: 7,
       type: 'wms',
@@ -109,7 +109,7 @@ export const switzerland = {
     },
     {
       key: 'wanderwege',
-      name: 'swisstopo — Hiking Trails',
+      name: 'layer_wanderwege',
       category: 'Analysis',
       order: 6,
       type: 'wms',
@@ -122,7 +122,7 @@ export const switzerland = {
     },
     {
       key: 'ov_haltestellen',
-      name: 'bav — Public Transport Stops',
+      name: 'layer_ov_haltestellen',
       category: 'Analysis',
       order: 5,
       type: 'wms',
@@ -135,7 +135,7 @@ export const switzerland = {
     },
     {
       key: 'sac_huetten',
-      name: 'swisstopo — Winter Accommodations',
+      name: 'layer_sac_huetten',
       category: 'Analysis',
       order: 4,
       type: 'wms',
@@ -148,7 +148,7 @@ export const switzerland = {
     },
     {
       key: 'wildtierschutzgebiete',
-      name: 'bafu — Wildlife Protection Areas',
+      name: 'layer_wildtierschutzgebiete',
       category: 'Analysis',
       order: 2,
       type: 'wms',

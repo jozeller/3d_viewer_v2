@@ -44,6 +44,7 @@ export function initAuthUI() {
   const logoutBtn = $('authLogoutBtn')
   const drawerToggle = $('drawerToggle')
   const drawerBackdrop = $('drawerBackdrop')
+  const languageToggleBtn = $('languageToggleBtn')
 
   const panel = $('authPanel')
   const tabLogin = $('tabLogin')
@@ -85,7 +86,7 @@ export function initAuthUI() {
     btnForgot.classList.toggle('is-hidden', isRegister)
     btnForgot.classList.toggle('is-visible', !isRegister)
 
-    btnPrimary.textContent = isRegister ? 'Register' : 'Login'
+    btnPrimary.textContent = isRegister ? window.i18n.getTranslation('register') : window.i18n.getTranslation('login')
     setMsg('')
   }
 
@@ -110,13 +111,22 @@ export function initAuthUI() {
     hide(loggedInRow)
     password.value = ''
     closePanel()
+    // Move language toggle to logged out row
+    if (languageToggleBtn && loggedOutRow && !loggedOutRow.contains(languageToggleBtn)) {
+      loggedOutRow.insertBefore(languageToggleBtn, openLoginBtn)
+    }
   }
 
   function applyLoggedInUI(user) {
-    identity.textContent = `Welcome, ${displayNameFromUser(user)}`
-    hide(loggedOutRow)
-    show(loggedInRow)
-    closePanel()
+    const welcomeText = window.i18n ? window.i18n.getTranslation('welcome') : 'Willkommen';
+    identity.textContent = welcomeText + ', ' + displayNameFromUser(user);
+    hide(loggedOutRow);
+    show(loggedInRow);
+    closePanel();
+    // Move language toggle to logged in row
+    if (languageToggleBtn && loggedInRow && !loggedInRow.contains(languageToggleBtn)) {
+      loggedInRow.insertBefore(languageToggleBtn, identity)
+    }
   }
 
   async function refreshUI() {

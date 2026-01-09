@@ -91,11 +91,14 @@ ALTER TABLE public.tours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_members ENABLE ROW LEVEL SECURITY;
 
 -- tours: Policies
-CREATE POLICY "select_own_or_public" ON public.tours
+DROP POLICY IF EXISTS "select_own_or_public" ON public.tours;
+DROP POLICY IF EXISTS "select_own_or_public_or_shared" ON public.tours;
+CREATE POLICY "select_own_or_public_or_shared" ON public.tours
   FOR SELECT
   USING (
     owner_id = auth.uid()
     OR visibility = 'public'
+    OR EXISTS (SELECT 1 FROM public.tour_members tm WHERE tm.tour_id = public.tours.id AND tm.user_id = auth.uid())
   );
 
 CREATE POLICY "insert_own" ON public.tours
@@ -110,26 +113,38 @@ CREATE POLICY "delete_own" ON public.tours
   FOR DELETE
   USING (owner_id = auth.uid());
 
+-- Function to check if user owns a tour (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_tour_owner(p_tour_id uuid, p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM public.tours WHERE id = p_tour_id AND owner_id = p_user_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
 -- tour_members: Policies
+DROP POLICY IF EXISTS "select_member_or_owner" ON public.tour_members;
+DROP POLICY IF EXISTS "insert_owner_or_self" ON public.tour_members;
+DROP POLICY IF EXISTS "delete_owner_or_self" ON public.tour_members;
+
 CREATE POLICY "select_member_or_owner" ON public.tour_members
   FOR SELECT
   USING (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+    OR public.is_tour_owner(tour_id)
   );
 
 CREATE POLICY "insert_owner_or_self" ON public.tour_members
   FOR INSERT
   WITH CHECK (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+    OR public.is_tour_owner(tour_id)
   );
 
 CREATE POLICY "delete_owner_or_self" ON public.tour_members
   FOR DELETE
   USING (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.tours t WHERE t.id = public.tour_members.tour_id AND t.owner_id = auth.uid())
+    OR public.is_tour_owner(tour_id)
   );
 
 -- updated_at Trigger

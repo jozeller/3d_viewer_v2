@@ -184,13 +184,13 @@ function populateRegionSelect() {
   
   // Update toggle button
   regionFlagEl.innerHTML = `<img src="${currentRegion.flag}" alt="${currentRegion.code}" class="regionFlagImg">`;
-  regionNameEl.textContent = currentRegion.name;
+  regionNameEl.textContent = window.i18n ? window.i18n.getTranslation(currentRegion.code.toLowerCase()) : currentRegion.name;
   
   // Populate options list
   regionOptions.innerHTML = regionList.map(r => 
     `<li class="regionOption ${r.code === currentRegionCode ? 'is-selected' : ''}" data-code="${r.code}">
       <span class="regionFlag"><img src="${r.flag}" alt="${r.code}" class="regionFlagImg"></span>
-      <span class="regionNameText">${r.name}</span>
+      <span class="regionNameText">${window.i18n ? window.i18n.getTranslation(r.code.toLowerCase()) : r.name}</span>
     </li>`
   ).join('');
   
@@ -206,6 +206,9 @@ function populateRegionSelect() {
     });
   });
 }
+
+// Make populateRegionSelect available globally for translations
+window.populateRegionSelect = populateRegionSelect;
 
 // Toggle dropdown open/close
 regionToggle.addEventListener('click', (e) => {
@@ -263,6 +266,9 @@ const initialRegion = getRegion(currentRegionCode);
 // Create viewer (terrain, basic UI config) - async with top-level await
 const viewer = await createViewer('cesiumContainer', 'invisibleCredits', initialRegion.terrain);
 
+// Make viewer globally available for translations
+window.viewer = viewer;
+
 // Initial camera position from region config
 viewer.camera.setView({
   destination: Cesium.Cartesian3.fromDegrees(
@@ -279,6 +285,9 @@ viewer.camera.setView({
 
 // Init layers (adds only active layers, keeps references)
 layerState = initLayers(viewer, initialRegion.layers);
+
+// Make layerState globally available for translations
+window.layerState = layerState;
 
 // Legend UI binds to layerState operations
 addLayersToLegend(layerState, viewer);
@@ -578,14 +587,14 @@ async function currentUser() {
 }
 
 async function loadMyTours() {
-  toursList.innerHTML = 'Loading...';
+  toursList.innerHTML = window.i18n.getTranslation('loading');
   
   try {
     const user = await currentUser();
     console.log('loadMyTours: user =', user?.id || 'none');
     
     if (!user) { 
-      toursList.innerHTML = 'Please log in to see your tours.'; 
+      toursList.innerHTML = window.i18n.getTranslation('pleaseLogin'); 
       return;
     }
 
@@ -601,7 +610,7 @@ async function loadMyTours() {
     
     if (e1) {
       console.error('Error loading owned tours:', e1);
-      toursList.innerHTML = `Error loading tours: ${e1.message}`;
+      toursList.innerHTML = `${window.i18n.getTranslation('errorLoadingTours')} ${e1.message}`;
       return;
     }
 
@@ -638,7 +647,7 @@ async function loadMyTours() {
     console.log('loadMyTours: total tours =', all.length);
     
     if (!all.length) { 
-      toursList.innerHTML = '<div>No tours yet.</div>'; 
+      toursList.innerHTML = `<div>${window.i18n.getTranslation('noToursYet')}</div>`; 
       return;
     }
 
@@ -673,10 +682,10 @@ async function loadMyTours() {
     
     // Different menu options for owner vs member
     const menuItems = t.isOwner
-      ? `<li class="tourMenuRename" data-tour="${t.id}">Rename</li>
-         <li class="tourMenuShare" data-tour="${t.id}" data-title="${t.title}">Share</li>
-         <li class="tourMenuDelete" data-tour="${t.id}" data-is-owner="true">Delete</li>`
-      : `<li class="tourMenuLeave" data-tour="${t.id}">Leave tour</li>`;
+      ? `<li class="tourMenuRename" data-tour="${t.id}" data-i18n="rename">Rename</li>
+         <li class="tourMenuShare" data-tour="${t.id}" data-title="${t.title}" data-i18n="share">Share</li>
+         <li class="tourMenuDelete" data-tour="${t.id}" data-is-owner="true" data-i18n="delete">Delete</li>`
+      : `<li class="tourMenuLeave" data-tour="${t.id}" data-i18n="leaveTour">Leave tour</li>`;
     
     // Share icon - shown for owners if shared, always for members
     // Different tooltip text for owner vs member
@@ -709,14 +718,14 @@ async function loadMyTours() {
       </div>
       <!-- Shared members popup -->
       <div class="tourMembersPopup is-hidden" data-tour="${t.id}">
-        <div class="tourMembersPopupHeader">Shared with:</div>
-        <div class="tourMembersPopupList" data-tour="${t.id}">Loading...</div>
+        <div class="tourMembersPopupHeader">${window.i18n ? window.i18n.getTranslation('sharedWith') : 'Shared with:'}</div>
+        <div class="tourMembersPopupList" data-tour="${t.id}">${window.i18n ? window.i18n.getTranslation('loading') : 'Loading...'}</div>
       </div>
       <div class="tourContent ${isHidden ? 'is-hidden' : ''}" id="content-${t.id}">
-        <div class="tracksList" id="tracks-${t.id}">Loading tracks...</div>
+        <div class="tracksList" id="tracks-${t.id}">${window.i18n ? window.i18n.getTranslation('loadingTracks') : 'Loading tracks...'}</div>
         <div class="tourActions">
-          <label class="uploadLabel" title="Upload Track-File">
-            <span class="uploadBtnText">Upload Track-File</span>
+          <label class="uploadLabel" title="${window.i18n ? window.i18n.getTranslation('uploadTrack') : 'Upload Track-File'}">
+            <span class="uploadBtnText">${window.i18n ? window.i18n.getTranslation('uploadTrack') : 'Upload Track-File'}</span>
             <input type="file" accept=".gpx,.kml,.geojson,.json" class="uploadGpx srOnlyFile" data-tour="${t.id}" />
           </label>
           <span class="uploadStatus" data-tour="${t.id}"></span>
@@ -724,6 +733,9 @@ async function loadMyTours() {
       </div>
     `;
     toursList.appendChild(el);
+
+    // Update translations for newly added elements
+    if (window.i18n) window.i18n.updateTexts();
 
     // Shared button click - show members popup
     const sharedBtn = el.querySelector('.tourSharedBtn');
@@ -802,15 +814,15 @@ async function loadMyTours() {
       // open tour if it was closed
       content.classList.remove('is-hidden');
       
-      statusSpan.textContent = 'Uploading...';
+      statusSpan.textContent = window.i18n ? window.i18n.getTranslation('uploading') : 'Uploading...';
       statusSpan.style.color = 'blue';
       try {
         await handleFileUpload(file, t.id, t.isOwner);
-        statusSpan.textContent = '✓ Uploaded';
+        statusSpan.textContent = window.i18n ? '✓ ' + window.i18n.getTranslation('uploaded') : '✓ Uploaded';
         statusSpan.style.color = 'green';
         setTimeout(() => { statusSpan.textContent = ''; }, 3000);
       } catch (e) {
-        statusSpan.textContent = '✗ Failed: ' + (e.message || 'Unknown error');
+        statusSpan.textContent = window.i18n ? '✗ ' + window.i18n.getTranslation('uploadFailed') + ': ' + (e.message || window.i18n.getTranslation('unknownError')) : '✗ Failed: ' + (e.message || 'Unknown error');
         statusSpan.style.color = 'red';
       }
       uploadInput.value = '';
@@ -861,7 +873,7 @@ async function loadMyTours() {
           if (newName && newName !== t.title) {
             const { error } = await supabase.from('tours').update({ title: newName }).eq('id', t.id);
             if (error) {
-              await showAlert({ title: 'Rename Failed', message: error.message, icon: '❌', variant: 'danger' });
+              await showAlert({ title: window.i18n.getTranslation('renameFailed'), message: error.message, icon: '❌', variant: 'danger' });
               tourTitleEl.textContent = t.title; // Revert
               return;
             }
@@ -898,25 +910,28 @@ async function loadMyTours() {
         // Get member count to warn owner
         const { data: memberCount } = await supabase.rpc('get_tour_member_count', { p_tour_id: t.id });
         
-        let confirmMsg = `Really delete tour "${t.title}"? This cannot be undone.`;
+        let confirmMsg = window.i18n.getTranslation('deleteTourConfirm').replace('{title}', t.title);
         let confirmIcon = '🗑️';
         if (memberCount && memberCount > 0) {
-          confirmMsg = `Really delete tour "${t.title}"?\n\nThis tour is shared with ${memberCount} person${memberCount > 1 ? 's' : ''}. Deleting it will remove access for all members.\n\nThis cannot be undone.`;
+          confirmMsg = window.i18n.getTranslation('deleteTourConfirmShared')
+            .replace('{title}', t.title)
+            .replace('{count}', memberCount)
+            .replace('{plural}', memberCount > 1 ? (window.i18n.currentLanguage === 'de' ? 'en' : 's') : '');
           confirmIcon = '⚠️';
         }
         
         const confirmed = await showConfirm({
-          title: 'Delete Tour',
+          title: window.i18n.getTranslation('deleteTour'),
           message: confirmMsg,
           icon: confirmIcon,
           variant: 'danger',
-          confirmText: 'Delete',
+          confirmText: window.i18n.getTranslation('delete'),
           confirmStyle: 'danger'
         });
         if (!confirmed) return;
         const { error } = await supabase.from('tours').delete().eq('id', t.id);
         if (error) {
-          statusSpan.textContent = '✗ Delete failed: ' + error.message;
+          statusSpan.textContent = window.i18n ? '✗ ' + window.i18n.getTranslation('deleteFailedStatus') + ': ' + error.message : '✗ Delete failed: ' + error.message;
           statusSpan.style.color = 'red';
           return;
         }
@@ -932,11 +947,11 @@ async function loadMyTours() {
         tourMenuBtn.setAttribute('aria-expanded', 'false');
         
         const confirmed = await showConfirm({
-          title: 'Leave Tour',
-          message: `Leave tour "${t.title}"?\n\nYou can only see it again if the owner shares it with you again.`,
+          title: window.i18n.getTranslation('leaveTourTitle'),
+          message: window.i18n.getTranslation('leaveTourConfirm').replace('{title}', t.title),
           icon: '🚪',
           variant: 'warning',
-          confirmText: 'Leave',
+          confirmText: window.i18n.getTranslation('leaveTour'),
           confirmStyle: 'danger'
         });
         if (!confirmed) return;
@@ -946,7 +961,7 @@ async function loadMyTours() {
           if (error) {
             console.error('Leave tour error:', error);
             await showAlert({
-              title: 'Leave Failed',
+              title: window.i18n.getTranslation('leaveFailed'),
               message: error.message,
               icon: '❌',
               variant: 'danger'
@@ -957,8 +972,8 @@ async function loadMyTours() {
         } catch (e) {
           console.error('Leave tour exception:', e);
           await showAlert({
-            title: 'Leave Failed',
-            message: e.message || 'Unknown error',
+            title: window.i18n.getTranslation('leaveFailed'),
+            message: e.message || window.i18n.getTranslation('unknownError'),
             icon: '❌',
             variant: 'danger'
           });
@@ -987,18 +1002,18 @@ async function loadMyTours() {
   }
   } catch (err) {
     console.error('Error in loadMyTours:', err);
-    toursList.innerHTML = `<div style="color: red;">Error: ${err.message || 'Unknown error'}</div>`;
+    toursList.innerHTML = `<div style="color: red;">${window.i18n.getTranslation('errorLoadingTours')} ${err.message || window.i18n.getTranslation('unknownError')}</div>`;
   }
 }
 
 async function loadTracksForTour(tourId, isTourOwner = false) {
   const container = document.getElementById(`tracks-${tourId}`);
-  container.innerHTML = 'Loading...';
+  container.innerHTML = window.i18n ? window.i18n.getTranslation('loading') : 'Loading...';
   // get tracks for user and filter by tour
   const { data, error } = await supabase.rpc('get_tracks_for_user');
-  if (error) { container.innerHTML = 'Error loading tracks'; return }
+  if (error) { container.innerHTML = window.i18n ? window.i18n.getTranslation('errorLoadingTracks') : 'Error loading tracks'; return }
   const tracks = (data || []).filter(r => r.tour_id === tourId);
-  if (!tracks.length) { container.innerHTML = '<div>No tracks</div>'; return }
+  if (!tracks.length) { container.innerHTML = `<div>${window.i18n ? window.i18n.getTranslation('noTracks') : 'No tracks'}</div>`; return }
   container.innerHTML = '';
   // Get current user ID to check track ownership
   const currentUserId = (await supabase.auth.getUser())?.data?.user?.id;
@@ -1027,14 +1042,14 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
           </button>
           <input type="color" class="trackColorPicker srColorInput" data-track="${tr.id}" value="${defaultColor}" aria-label="Select track color" />
           <div class="trackMenuWrap">
-            <button class="iconBtn trackMenuBtn" data-track="${tr.id}" title="More options" aria-haspopup="true" aria-expanded="false">
+            <button class="iconBtn trackMenuBtn" data-track="${tr.id}" title="${window.i18n ? window.i18n.getTranslation('moreOptions') : 'More options'}" aria-haspopup="true" aria-expanded="false">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
             </button>
             <ul class="trackMenu is-hidden" data-track="${tr.id}">
-              <li class="trackMenuDownload" data-track="${tr.id}" data-original="${tr.original_file_path || ''}">Download GPX</li>
-              ${canEdit ? `<li class="trackMenuEdit" data-track="${tr.id}">Edit</li>` : ''}
-              <li class="trackMenuCenter" data-track="${tr.id}">Center</li>
-              ${canDelete ? `<li class="trackMenuDelete" data-track="${tr.id}">Delete</li>` : ''}
+              <li class="trackMenuDownload" data-track="${tr.id}" data-original="${tr.original_file_path || ''}" data-i18n="downloadGpx">Download GPX</li>
+              ${canEdit ? `<li class="trackMenuEdit" data-track="${tr.id}" data-i18n="edit">Edit</li>` : ''}
+              <li class="trackMenuCenter" data-track="${tr.id}" data-i18n="center">Center</li>
+              ${canDelete ? `<li class="trackMenuDelete" data-track="${tr.id}" data-i18n="delete">Delete</li>` : ''}
             </ul>
           </div>
         </div>
@@ -1176,8 +1191,8 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
       } catch (e) {
         console.error('Download failed:', e);
         await showAlert({
-          title: 'Download Failed',
-          message: e.message || 'Unknown error',
+          title: window.i18n.getTranslation('downloadFailed'),
+          message: e.message || window.i18n.getTranslation('unknownError'),
           icon: '❌',
           variant: 'danger'
         });
@@ -1196,7 +1211,7 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
           if (newName) {
             const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
             if (error) {
-              await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
+              await showAlert({ title: window.i18n.getTranslation('saveFailed'), message: error.message, icon: '❌', variant: 'danger' });
               return;
             }
             tr.name = newName;
@@ -1216,7 +1231,7 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
             if (newName && newName !== tr.name) {
               const { error } = await supabase.from('tour_tracks').update({ name: newName }).eq('id', tr.id);
               if (error) {
-                await showAlert({ title: 'Save Failed', message: error.message, icon: '❌', variant: 'danger' });
+                await showAlert({ title: window.i18n.getTranslation('saveFailed'), message: error.message, icon: '❌', variant: 'danger' });
                 return;
               }
               tr.name = newName;
@@ -1248,11 +1263,11 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
         menuBtn.setAttribute('aria-expanded', 'false');
         
         const confirmed = await showConfirm({
-          title: 'Delete Track',
-          message: `Delete track "${tr.name || 'Unnamed'}"?\n\nThis cannot be undone.`,
+          title: window.i18n.getTranslation('deleteTrack'),
+          message: window.i18n.getTranslation('deleteTrackConfirm').replace('{name}', tr.name || 'Unnamed'),
           icon: '🗑️',
           variant: 'danger',
-          confirmText: 'Delete',
+          confirmText: window.i18n.getTranslation('delete'),
           confirmStyle: 'danger'
         });
         if (!confirmed) return;
@@ -1271,7 +1286,7 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
         
         const { error } = await supabase.from('tour_tracks').delete().eq('id', tr.id);
         if (error) {
-          await showAlert({ title: 'Delete Failed', message: error.message, icon: '❌', variant: 'danger' });
+          await showAlert({ title: window.i18n.getTranslation('deleteFailed'), message: error.message, icon: '❌', variant: 'danger' });
           return;
         }
         // remove from map
@@ -1282,6 +1297,9 @@ async function loadTracksForTour(tourId, isTourOwner = false) {
       });
     }
   }
+
+  // Update translations for newly added track elements
+  if (window.i18n) window.i18n.updateTexts();
 }
 
 async function toggleShowAllTracksForTour(tourId) {
@@ -1295,7 +1313,7 @@ async function toggleShowAllTracksForTour(tourId) {
   // Always fetch tracks and then decide: if none of these tracks are shown, show them; otherwise remove them
   const { data, error } = await supabase.rpc('get_tracks_for_user');
   if (error) {
-    await showAlert({ title: 'Load Failed', message: 'Could not load tracks: ' + error.message, icon: '❌', variant: 'danger' });
+    await showAlert({ title: window.i18n.getTranslation('loadFailed'), message: window.i18n.getTranslation('couldNotLoadTracks') + error.message, icon: '❌', variant: 'danger' });
     return;
   }
   const tracks = (data || []).filter(r => r.tour_id === tourId);
@@ -1645,18 +1663,18 @@ newTourForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const title = newTourTitleInput.value.trim();
   if (!title) {
-    await showAlert({ title: 'Missing Name', message: 'Please provide a tour name.', icon: '✏️', variant: 'warning' });
+    await showAlert({ title: window.i18n.getTranslation('missingName'), message: window.i18n.getTranslation('pleaseProvideTourName'), icon: '✏️', variant: 'warning' });
     return;
   }
   const user = await currentUser();
   if (!user) {
-    await showAlert({ title: 'Login Required', message: 'Please log in to create tours.', icon: '🔒', variant: 'warning' });
+    await showAlert({ title: window.i18n.getTranslation('loginRequired'), message: window.i18n.getTranslation('pleaseLoginToCreate'), icon: '🔒', variant: 'warning' });
     return;
   }
   const slug = generateTourSlug();
   const { data, error } = await supabase.from('tours').insert([{ title, slug, owner_id: user.id }]).select();
   if (error) {
-    await showAlert({ title: 'Create Failed', message: error.message, icon: '❌', variant: 'danger' });
+    await showAlert({ title: window.i18n.getTranslation('createFailed'), message: error.message, icon: '❌', variant: 'danger' });
     return;
   }
   hideCreateTourForm();

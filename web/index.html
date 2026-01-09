@@ -31,7 +31,7 @@
     <!-- Header -->
     <header class="drawerHeader">
       <div class="drawerBrand">
-        <div class="drawerTitleMain">3D Viewer</div>
+        <div class="drawerTitleMain" data-i18n="appTitle">3D Viewer</div>
         <div class="drawerTitleRow">
           <div id="regionDropdown" class="regionDropdown" aria-label="Select Region">
             <button id="regionToggle" class="regionToggle" type="button">
@@ -62,20 +62,20 @@
     <section class="section sectionScroll">
       <div id="infoPanel" class="infoPanelDropdown is-hidden">
         <div class="infoPanelContent">
-          <p><strong>Base Maps:</strong> Select a base map</p>
-          <p><strong>Analysis Layers:</strong> Multiple layers can be displayed simultaneously</p>
-          <p><strong>Hazard Maps:</strong> Overlay additional information</p>
-          <p><strong>Transparency:</strong> Adjust the opacity of layers</p>
+          <p><strong data-i18n="baseMaps">Base Maps:</strong> <span data-i18n="selectBaseMap">Select a base map</span></p>
+          <p><strong data-i18n="analysisLayers">Analysis Layers:</strong> <span data-i18n="multipleLayers">Multiple layers can be displayed simultaneously</span></p>
+          <p><strong data-i18n="hazardMaps">Hazard Maps:</strong> <span data-i18n="overlayInfo">Overlay additional information</span></p>
+          <p><strong data-i18n="transparency">Transparency:</strong> <span data-i18n="adjustOpacity">Adjust the opacity of layers</span></p>
           <hr class="infoDivider" />
-          <p><strong>My Tours:</strong> Log in to create tours, upload GPX tracks, and share them with others</p>
+          <p><strong data-i18n="myTours">My Tours:</strong> <span data-i18n="myToursDesc">Log in to create tours, upload GPX tracks, and share them with others</span></p>
           <hr class="infoDivider" />
           <div class="performanceControl">
-            <label for="performanceMode"><strong>Performance:</strong></label>
+            <label for="performanceMode" data-i18n="performance">Performance:</label>
             <select id="performanceMode" class="performanceSelect">
-              <option value="auto">Auto</option>
-              <option value="low">Power Saver</option>
-              <option value="medium">Balanced</option>
-              <option value="high">High Quality</option>
+              <option value="auto" data-i18n="auto">Auto</option>
+              <option value="low" data-i18n="powerSaver">Power Saver</option>
+              <option value="medium" data-i18n="balanced">Balanced</option>
+              <option value="high" data-i18n="highQuality">High Quality</option>
             </select>
             <span id="performanceTierLabel" class="performanceTierLabel"></span>
           </div>
@@ -83,8 +83,8 @@
       </div>
 
       <div class="drawer-nav">
-        <button id="navLegend" class="navBtn is-active" type="button">Legend</button>
-        <button id="navMyTours" class="navBtn is-hidden" type="button">My Tours</button>
+        <button id="navLegend" class="navBtn is-active" type="button" data-i18n="legend">Legend</button>
+        <button id="navMyTours" class="navBtn is-hidden" type="button" data-i18n="myTours">My Tours</button>
       </div>
 
       <div id="viewLegend">
@@ -93,11 +93,11 @@
 
       <div id="viewMyTours" class="is-hidden">
         <div class="myToursHeader">
-          <button id="createTourBtn" class="pillBtn" type="button">+ Create Tour</button>
+          <button id="createTourBtn" class="pillBtn" type="button" data-i18n="createTour">+ Create Tour</button>
           <form id="newTourForm" class="is-hidden">
-            <input id="newTourTitle" placeholder="Tour name" required />
-            <button type="submit" class="pillBtn">Create</button>
-            <button type="button" id="cancelTourBtn" class="pillBtn pillBtnGhost">Cancel</button>
+            <input id="newTourTitle" placeholder="Tour name" required data-i18n="tourName" />
+            <button type="submit" class="pillBtn" data-i18n="create">Create</button>
+            <button type="button" id="cancelTourBtn" class="pillBtn pillBtnGhost" data-i18n="cancel">Cancel</button>
           </form>
         </div>
 
@@ -111,7 +111,8 @@
 
       <!-- Logged out -->
       <div id="authFooterLoggedOut" class="authFooterRow">
-        <button id="authOpenLogin" class="pillBtn" type="button">Login</button>
+        <button id="languageToggleBtn" class="languageToggleBtn" type="button">DE</button>
+        <button id="authOpenLogin" class="pillBtn" type="button" data-i18n="login">Login</button>
       </div>
 
       <!-- Auth panel (login / register) -->
@@ -123,6 +124,7 @@
             type="button"
             role="tab"
             aria-selected="true"
+            data-i18n="login"
           >
             Login
           </button>
@@ -132,6 +134,7 @@
             type="button"
             role="tab"
             aria-selected="false"
+            data-i18n="register"
           >
             Register
           </button>
@@ -139,7 +142,7 @@
 
         <div class="authBox">
           <div class="authRow">
-            <label class="authLabel" for="authEmail">Email</label>
+            <label class="authLabel" for="authEmail" data-i18n="email">Email</label>
             <input
               id="authEmail"
               class="authInput"
@@ -149,7 +152,7 @@
           </div>
 
           <div class="authRow">
-            <label class="authLabel" for="authPassword">Password</label>
+            <label class="authLabel" for="authPassword" data-i18n="password">Password</label>
             <input
               id="authPassword"
               class="authInput"
@@ -160,7 +163,7 @@
 
           <!-- Register only -->
           <div class="authRow is-hidden" id="rowName">
-            <label class="authLabel" for="authName">Name (optional)</label>
+            <label class="authLabel" for="authName" data-i18n="nameOptional">Name (optional)</label>
             <input
               id="authName"
               class="authInput"
@@ -181,6 +184,7 @@
               id="btnForgotPw"
               class="textBtn is-visible"
               type="button"
+              data-i18n="forgotPassword"
             >
               Forgot password?
             </button>
@@ -192,12 +196,13 @@
       <!-- Logged in -->
       <div id="authFooterLoggedIn" class="authFooterRow is-hidden">
         <div id="authFooterIdentity" class="authFooterIdentity">
-          Welcome
+          Willkommen
         </div>
         <button
           id="authLogoutBtn"
           class="pillBtn pillBtnDanger"
           type="button"
+          data-i18n="logout"
         >
           Logout
         </button>
@@ -220,8 +225,8 @@
     id="locatorBtn"
     class="fab fabLocator"
     type="button"
-    aria-label="My Location"
-    title="My Location"
+    data-i18n-aria="myLocation"
+    data-i18n-title="myLocation"
   >
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="4"/>
@@ -237,17 +242,17 @@
     <div class="shareModalBackdrop"></div>
     <div class="shareModalContent">
       <div class="shareModalHeader">
-        <h2 class="shareModalTitle">Share Tour</h2>
-        <button class="shareModalClose" type="button" aria-label="Close">✖</button>
+        <h2 class="shareModalTitle" data-i18n="shareTour">Share Tour</h2>
+        <button class="shareModalClose" type="button" aria-label="Close" title="Schließen">✖</button>
       </div>
       <div class="shareModalBody">
-        <p class="shareModalHint">Enter one or more email addresses (one per line or separated by commas):</p>
+        <p class="shareModalHint" data-i18n="shareHint">Enter one or more email addresses (one per line or separated by commas):</p>
         <textarea id="shareModalEmails" class="shareModalTextarea" placeholder="email@example.com&#10;another@example.com" rows="4"></textarea>
         <div id="shareModalResults" class="shareModalResults"></div>
       </div>
       <div class="shareModalFooter">
-        <button id="shareModalCancel" class="pillBtn pillBtnGhost" type="button">Cancel</button>
-        <button id="shareModalSubmit" class="pillBtn" type="button">Share</button>
+        <button id="shareModalCancel" class="pillBtn pillBtnGhost" type="button" data-i18n="cancel">Cancel</button>
+        <button id="shareModalSubmit" class="pillBtn" type="button" data-i18n="share">Share</button>
       </div>
     </div>
   </div>
@@ -257,15 +262,16 @@
     <div class="confirmModalBackdrop"></div>
     <div class="confirmModalContent">
       <div class="confirmModalIcon" id="confirmModalIcon">⚠️</div>
-      <h2 class="confirmModalTitle" id="confirmModalTitle">Confirm</h2>
-      <p class="confirmModalMessage" id="confirmModalMessage">Are you sure?</p>
+      <h2 class="confirmModalTitle" id="confirmModalTitle" data-i18n="confirm">Confirm</h2>
+      <p class="confirmModalMessage" id="confirmModalMessage" data-i18n="areYouSure">Are you sure?</p>
       <div class="confirmModalFooter">
-        <button id="confirmModalCancel" class="pillBtn pillBtnGhost" type="button">Cancel</button>
-        <button id="confirmModalConfirm" class="pillBtn pillBtnDanger" type="button">Confirm</button>
+        <button id="confirmModalCancel" class="pillBtn pillBtnGhost" type="button" data-i18n="cancel">Cancel</button>
+        <button id="confirmModalConfirm" class="pillBtn pillBtnDanger" type="button" data-i18n="confirm">Confirm</button>
       </div>
     </div>
   </div>
 
+  <script src="./translations.js"></script>
   <script type="module" src="./main.js"></script>
 
   <script>
