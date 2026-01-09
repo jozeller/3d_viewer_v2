@@ -95,6 +95,15 @@ async function initTranslations() {
   }
   setLanguage(initialLang);
 
+  // Rebuild legend after translations are loaded
+  if (window.layerState && window.addLayersToLegend && window.viewer) {
+    const legendEl = document.getElementById('legend');
+    if (legendEl) {
+      legendEl.innerHTML = '';
+      window.addLayersToLegend(window.layerState, window.viewer);
+    }
+  }
+
   // Update texts again after a short delay to ensure all elements are ready
   setTimeout(() => updateTexts(), 100);
 

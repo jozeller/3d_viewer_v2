@@ -34,7 +34,7 @@ export const japan = {
     // === Base Maps ===
     {
       key: 'gsi_std',
-      name: 'GSI — Standard Map (日本語)',
+      name: 'layer_gsi_std',
       category: 'Base Maps',
       order: 98,
       type: 'xyz',
@@ -44,7 +44,7 @@ export const japan = {
     },
     {
       key: 'osm_english',
-      name: 'OpenStreetMap (English)',
+      name: 'layer_osm_english',
       category: 'Base Maps',
       order: 96,
       type: 'xyz',
@@ -54,7 +54,7 @@ export const japan = {
     },
     {
       key: 'gsi_pale',
-      name: 'GSI — Pale Map',
+      name: 'layer_gsi_pale',
       category: 'Base Maps',
       order: 99,
       type: 'xyz',
@@ -64,7 +64,7 @@ export const japan = {
     },
     {
       key: 'gsi_photo',
-      name: 'GSI — Aerial Photo',
+      name: 'layer_gsi_photo',
       category: 'Base Maps',
       order: 100,
       type: 'xyz',
@@ -76,7 +76,7 @@ export const japan = {
     // === Analysis Layers ===
     {
       key: 'gsi_slope',
-      name: 'GSI — Slope Gradient',
+      name: 'layer_gsi_slope',
       category: 'Analysis',
       order: 9,
       type: 'xyz',
@@ -86,8 +86,20 @@ export const japan = {
       collapsible: false
     },
     {
+      key: 'gsi_slopezone_avalanche',
+      name: 'layer_gsi_slopezone_avalanche',
+      category: 'Analysis',
+      order: 6,
+      type: 'xyz',
+      url: 'https://cyberjapandata.gsi.go.jp/xyz/slopezone1map/{z}/{x}/{y}.png',
+      active: false,
+      opacity: 0.4,
+      collapsible: true,
+      info: 'Hinweise zur Verwendung der nationalen Hangneigungsklassifizierungskarte (lawinenbezogen) [PDF 629 KB]'
+    },
+    {
       key: 'gsi_hillshade',
-      name: 'GSI — Hillshade',
+      name: 'layer_gsi_hillshade',
       category: 'Analysis',
       order: 8,
       type: 'xyz',
@@ -98,7 +110,7 @@ export const japan = {
     },
     {
       key: 'gsi_lcm',
-      name: 'GSI — Land Condition',
+      name: 'layer_gsi_lcm',
       category: 'Analysis',
       order: 7,
       type: 'xyz',
@@ -111,7 +123,7 @@ export const japan = {
     // === Hazard Maps ===
     {
       key: 'gsi_flood',
-      name: 'GSI — Flood Hazard',
+      name: 'layer_gsi_flood',
       category: 'Hazard Maps',
       order: 5,
       type: 'xyz',
@@ -122,7 +134,7 @@ export const japan = {
     },
     {
       key: 'gsi_landslide',
-      name: 'GSI — Landslide Risk',
+      name: 'layer_gsi_landslide',
       category: 'Hazard Maps',
       order: 4,
       type: 'xyz',
@@ -133,7 +145,7 @@ export const japan = {
     },
     {
       key: 'gsi_tsunami',
-      name: 'GSI — Tsunami Hazard',
+      name: 'layer_gsi_tsunami',
       category: 'Hazard Maps',
       order: 3,
       type: 'xyz',

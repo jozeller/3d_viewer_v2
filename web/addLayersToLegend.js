@@ -46,6 +46,7 @@ export function addLayersToLegend(layerState, viewer) {
 
     const h = document.createElement('h3');
     h.textContent = getTranslatedCategoryName(category);
+    h.setAttribute('data-category', category);
     categoryContainer.appendChild(h);
 
     const isRadio = radioGroups.includes(category);
@@ -191,6 +192,13 @@ export function syncLegendCheckboxes(layerState) {
 
 // Update legend texts without rebuilding the legend
 export function updateLegendTexts(layerState) {
+  // Update category headers
+  document.querySelectorAll('h3[data-category]').forEach(h => {
+    const category = h.getAttribute('data-category');
+    h.textContent = getTranslatedCategoryName(category);
+  });
+
+  // Update layer names
   for (const layer of layerState) {
     const input = document.getElementById(`layer-input-${sanitize(layer.key)}`);
     if (input) {
@@ -201,6 +209,27 @@ export function updateLegendTexts(layerState) {
       }
     }
   }
+
+  // Update collapsible buttons
+  document.querySelectorAll('.legend-collapsible-btn').forEach(button => {
+    const hiddenLayers = button.nextElementSibling;
+    const isHidden = hiddenLayers.classList.contains('is-hidden');
+    const layers = hiddenLayers.querySelectorAll('.legend-item');
+    const count = layers.length;
+    const plural = count !== 1 ? 's' : '';
+    const germanPlural = count !== 1 ? 'e' : '';
+    const germanMore = count !== 1 ? 'r' : '';
+    button.textContent = isHidden 
+      ? (window.i18n ? window.i18n.getTranslation('showMoreItems') : '+ Show {count} more item{plural}')
+          .replace('{count}', count)
+          .replace('{plural}', plural)
+          .replace('{e}', germanPlural)
+          .replace('{r}', germanMore)
+      : (window.i18n ? window.i18n.getTranslation('hideItems') : '− Hide {count} item{plural}')
+          .replace('{count}', count)
+          .replace('{plural}', plural)
+          .replace('{e}', germanPlural);
+  });
 }
 
 // Make functions globally available
