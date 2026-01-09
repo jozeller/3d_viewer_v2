@@ -1517,6 +1517,13 @@ async function zoomToTrackSmart(trackId) {
     const centerLat = stats.center_lat;
     const centerEle = ((bbox.min_ele || 0) + (bbox.max_ele || 0)) / 2;
     
+    // Detect region from center coordinates and switch if necessary
+    const detectedRegion = detectRegionByCoordinates(centerLon, centerLat);
+    if (detectedRegion && detectedRegion !== currentRegionCode) {
+      await switchRegion(detectedRegion);
+      populateRegionSelect(); // Update dropdown UI
+    }
+    
     // Create center position
     const centerPosition = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, centerEle);
     

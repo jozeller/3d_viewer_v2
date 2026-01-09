@@ -16,12 +16,12 @@ export const japan = {
     roll: 0
   },
   
-  // Bounding box for Niseko area, Hokkaido (used for home button, etc.)
+  // Bounding box for Japan (expanded to cover the entire country)
   bounds: {
-    west: 140.4,
-    south: 42.65,
-    east: 141.0,
-    north: 43.05
+    west: 122.0,
+    south: 20.0,
+    east: 154.0,
+    north: 46.0
   },
   
   // Terrain provider configuration
